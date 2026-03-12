@@ -2,5 +2,21 @@
 uv = "latest"
 
 [env]
+# set OPENROUTER_API_KEY
 _.file = '.env'
-MODEL = "stepfun/step-3.5-flash:free"
+
+# 無料モデル：256K context length, free
+# see https://openrouter.ai/stepfun/step-3.5-flash:free
+# MODEL = "stepfun/step-3.5-flash:free"
+
+# ツール対応モデル：41K context length, $0.08 input
+# see https://openrouter.ai/qwen/qwen3-32b
+MODEL = "qwen/qwen3-32b"
+
+# 会話向けモデル：131.1K context length, $0.03 input
+# see https://openrouter.ai/openai/gpt-oss-20b
+# MODEL = "openai/gpt-oss-20b"
+
+# 小規模モデル：16.4K context length, $0.02 input
+# see https://openrouter.ai/meta-llama/llama-3.1-8b-instruct
+# MODEL = "meta-llama/llama-3.1-8b-instruct"
