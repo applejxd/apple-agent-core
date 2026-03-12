@@ -1,4 +1,8 @@
-"""FastAPI + WebSocket server with embedded chat UI."""
+"""FastAPI + WebSocket サーバーモジュール（組み込みチャット UI 付き）。
+
+ブラウザから使える Web チャット UI を HTML として組み込み、
+WebSocket 経由でエージェントループとリアルタイム通信する。
+"""
 
 import asyncio
 import json
@@ -416,6 +420,11 @@ _clients: dict[str, LLMClient] = {}
 
 
 def get_client() -> LLMClient:
+    """API キーとモデルをキーとしてキャッシュした LLMClient を返す。
+
+    :return: キャッシュ済みの :class:`~my_agent_core.llm.LLMClient` インスタンス。
+    :raises ValueError: ``OPENROUTER_API_KEY`` 環境変数が未設定の場合。
+    """
     key = os.environ.get("OPENROUTER_API_KEY", "")
     model = os.environ.get("MODEL", "")
     cache_key = f"{key}:{model}"
@@ -426,12 +435,19 @@ def get_client() -> LLMClient:
 
 @app.get("/", response_class=HTMLResponse)
 async def index() -> str:
+    """チャット UI の HTML を返す。
+
+    :return: 組み込みチャット UI の HTML 文字列。
+    """
     return HTML
 
 
 @app.get("/api/sessions")
 async def list_sessions() -> dict[str, Any]:
-    """List sessions from SESSION_DIR."""
+    """SESSION_DIR 内のセッション一覧を返す。
+
+    :return: セッション情報（ID・メッセージ件数）のリストを含む辞書。
+    """
     session_base = os.environ.get("SESSION_DIR", "/workspace/.session")
     base = Path(session_base)
     sessions = []
@@ -454,12 +470,20 @@ async def list_sessions() -> dict[str, Any]:
 
 @app.get("/api/new-session")
 async def api_new_session() -> dict[str, str]:
-    """Return a new time-sortable session ID."""
+    """時刻順ソート可能な新しいセッション ID を返す。
+
+    :return: 新規セッション ID を含む辞書（キー: ``session_id``）。
+    """
     return {"session_id": new_session_id()}
 
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
+    """WebSocket 接続を受け付けてエージェントループを実行する。
+
+    :param websocket: FastAPI WebSocket 接続オブジェクト。
+    :param session_id: 接続するセッションの ID。
+    """
     await websocket.accept()
     cwd = os.environ.get("WORKSPACE_DIR", os.getcwd())
     session = load_session(session_id, cwd)
@@ -497,7 +521,15 @@ async def _run_agent(
     session: Session,
     system_prompt: str,
 ) -> None:
-    """Run one agent turn (possibly multiple LLM calls) streaming to WebSocket."""
+    """エージェントの 1 ターン（LLM 呼び出し → ツール実行）を WebSocket にストリーミングする。
+
+    ツール呼び出しがなくなるまでループを継続する。
+
+    :param ws: ストリーミング先の WebSocket 接続。
+    :param client: LLM との通信に使用するクライアント。
+    :param session: 現在の会話セッション。
+    :param system_prompt: LLM に渡すシステムプロンプト。
+    """
     messages = [Message(role="system", content=system_prompt)] + session.messages
 
     while True:
@@ -559,6 +591,11 @@ async def _run_agent(
 
 
 def serve(host: str = "0.0.0.0", port: int = 8000) -> None:
+    """uvicorn で FastAPI アプリを起動する。
+
+    :param host: バインドするホストアドレス。デフォルトは全インターフェース。
+    :param port: バインドするポート番号。デフォルトは 8000。
+    """
     import uvicorn
     from dotenv import load_dotenv
 

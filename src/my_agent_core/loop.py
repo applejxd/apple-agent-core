@@ -1,20 +1,29 @@
-"""Core agent loop: LLM call → tool execution → repeat."""
+"""コアエージェントループモジュール。
+
+LLM 呼び出し → ツール実行 → 追記 → 繰り返し のループを実装する。
+完了宣言（ツール呼び出しなし）まで継続する。
+"""
 
 from .llm import LLMClient
 from .session import Session, append_and_save
 from .tools import TOOL_DEFINITIONS, execute_tool
 from .types import Message, ToolCall
 
-MAX_CONTEXT_MESSAGES = 40  # max non-system messages kept in context window
+#: コンテキストウィンドウに保持する最大メッセージ数（system メッセージを除く）。
+MAX_CONTEXT_MESSAGES = 40
 
 
 def _trim_messages(
     messages: list[Message], max_count: int = MAX_CONTEXT_MESSAGES
 ) -> list[Message]:
-    """Trim message list to max_count, removing oldest turns first.
+    """メッセージリストを最大件数に切り詰める。
 
-    Removal is done at turn boundaries (user → assistant → tool results)
-    so the LLM always receives a structurally valid conversation.
+    ターン境界（user → assistant → tool 結果）で削除するため、
+    LLM には常に構造的に正しい会話が渡される。
+
+    :param messages: 切り詰め対象のメッセージリスト。
+    :param max_count: 保持するメッセージの最大件数。
+    :return: 切り詰め後のメッセージリスト。
     """
     if len(messages) <= max_count:
         return messages
@@ -35,7 +44,12 @@ def _trim_messages(
 
 
 async def run_loop(client: LLMClient, session: Session, system_prompt: str) -> None:
-    """Run the agent loop until the LLM makes no more tool calls."""
+    """ツール呼び出しがなくなるまでエージェントループを実行する。
+
+    :param client: LLM との通信に使用する :class:`~my_agent_core.llm.LLMClient`。
+    :param session: 現在の会話セッション。
+    :param system_prompt: LLM に渡すシステムプロンプト文字列。
+    """
     context = _trim_messages(session.messages)
     messages = [Message(role="system", content=system_prompt)] + context
 

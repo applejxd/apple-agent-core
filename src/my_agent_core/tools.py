@@ -1,16 +1,32 @@
+"""ファイル操作・コマンド実行のツール定義モジュール。
+
+LLM に提供する 4 つのツール（read / write / edit / bash）の実装と
+JSON Schema 定義を提供する。
+"""
+
 import json
 import subprocess
 from pathlib import Path
 from typing import Any
 
-
+#: bash ツールが返す最大出力サイズ（バイト）。
 MAX_OUTPUT_BYTES = 100_000
+
+#: bash ツールのデフォルトタイムアウト秒数。
 DEFAULT_BASH_TIMEOUT = 30
 
 
 def _tool(
     name: str, description: str, properties: dict[str, Any], required: list[str]
 ) -> dict[str, Any]:
+    """LLM 向けツール定義辞書を組み立てるヘルパー。
+
+    :param name: ツール名。
+    :param description: ツールの説明文（英語）。
+    :param properties: パラメータの JSON Schema プロパティ定義。
+    :param required: 必須パラメータ名のリスト。
+    :return: OpenAI function-calling 形式のツール定義辞書。
+    """
     return {
         "type": "function",
         "function": {
@@ -81,9 +97,16 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         ["command"],
     ),
 ]
+"""LLM に提供するツール定義のリスト（JSON Schema 形式）。"""
 
 
 def _resolve(path: str, cwd: str) -> Path:
+    """相対パスを絶対パスに解決する。
+
+    :param path: ファイルパス（絶対または相対）。
+    :param cwd: 相対パスの基準となる作業ディレクトリ。
+    :return: 解決済みの絶対パス。
+    """
     p = Path(path)
     if not p.is_absolute():
         p = Path(cwd) / p
@@ -93,6 +116,14 @@ def _resolve(path: str, cwd: str) -> Path:
 def tool_read(
     path: str, cwd: str, offset: int | None = None, limit: int | None = None
 ) -> str:
+    """ファイルの内容を読み込み、行番号付きで返す。
+
+    :param path: 読み込むファイルのパス（絶対パスまたは相対パス）。
+    :param cwd: 相対パスの基準となる作業ディレクトリ。
+    :param offset: 読み込み開始行（1-indexed）。省略時は先頭から。
+    :param limit: 返す最大行数。省略時は全行。
+    :return: 行番号付きのファイル内容。エラー時はエラーメッセージ文字列。
+    """
     p = _resolve(path, cwd)
     try:
         lines = p.read_text(errors="replace").splitlines(keepends=True)
@@ -111,6 +142,13 @@ def tool_read(
 
 
 def tool_write(path: str, content: str, cwd: str) -> str:
+    """ファイルを新規作成または上書きする。
+
+    :param path: 書き込み先のファイルパス。
+    :param content: ファイルに書き込む内容。
+    :param cwd: 相対パスの基準となる作業ディレクトリ。
+    :return: 書き込み結果を示すメッセージ。
+    """
     p = _resolve(path, cwd)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content)
@@ -120,10 +158,17 @@ def tool_write(path: str, content: str, cwd: str) -> str:
 def tool_edit(
     path: str, old_str: str, new_str: str, cwd: str, occurrence_index: int | None = None
 ) -> str:
-    """Replace old_str with new_str in the file.
+    """ファイル内の文字列を置換する。
 
-    If occurrence_index is given (1-based), replace only that occurrence.
-    Otherwise old_str must appear exactly once.
+    ``occurrence_index`` を指定した場合は指定番目のマッチのみを置換する。
+    省略した場合は ``old_str`` がファイル内にちょうど 1 回だけ出現する必要がある。
+
+    :param path: 編集対象のファイルパス。
+    :param old_str: 置換前の文字列（完全一致）。
+    :param new_str: 置換後の文字列。
+    :param cwd: 相対パスの基準となる作業ディレクトリ。
+    :param occurrence_index: 置換対象のマッチ番号（1-indexed）。省略時は 1 回のみ許容。
+    :return: 編集結果を示すメッセージ。エラー時はエラーメッセージ文字列。
     """
     p = _resolve(path, cwd)
     try:
@@ -159,6 +204,13 @@ def tool_edit(
 
 
 def tool_bash(command: str, cwd: str, timeout: int = DEFAULT_BASH_TIMEOUT) -> str:
+    """bash コマンドを実行し、標準出力と標準エラーを結合して返す。
+
+    :param command: 実行する bash コマンド文字列。
+    :param cwd: コマンドを実行する作業ディレクトリ。
+    :param timeout: タイムアウト秒数。デフォルトは :data:`DEFAULT_BASH_TIMEOUT`。
+    :return: 標準出力 + 標準エラーの結合文字列。エラー時はエラーメッセージ。
+    """
     try:
         result = subprocess.run(
             command,
@@ -179,6 +231,13 @@ def tool_bash(command: str, cwd: str, timeout: int = DEFAULT_BASH_TIMEOUT) -> st
 
 
 def execute_tool(name: str, arguments: str, cwd: str) -> str:
+    """ツール名と JSON 引数文字列からツールを実行して結果を返す。
+
+    :param name: ツール名（ ``"read"`` / ``"write"`` / ``"edit"`` / ``"bash"``）。
+    :param arguments: JSON 文字列形式のツール引数。
+    :param cwd: 相対パスの基準となる作業ディレクトリ。
+    :return: ツール実行結果の文字列。
+    """
     try:
         args: dict[str, Any] = json.loads(arguments)
     except json.JSONDecodeError as e:

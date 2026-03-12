@@ -1,5 +1,7 @@
 # my-agent-core
 
+![demo](docs/demo.png)
+
 [pi-mono](https://github.com/badlogic/pi-mono) のモジュールの一つ pi-agent-core の Python (uv) 超シンプル版。OpenRouter 専用、Docker 隔離で YOLO モード。
 
 ## 設計思想

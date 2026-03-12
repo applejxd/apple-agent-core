@@ -1,4 +1,8 @@
-"""CLI entry point for my-agent-core."""
+"""CLI エントリポイントモジュール。
+
+ターミナルからエージェントを起動する ``agent`` コマンドを実装する。
+WebUI（FastAPI サーバー）の起動にも対応する。
+"""
 
 import asyncio
 import os
@@ -17,21 +21,22 @@ from .types import Message
 
 
 def _expand_file_refs(text: str, cwd: str) -> str:
-    """Expand @path references in user input with the contents of the referenced file.
+    """ユーザー入力内の ``@パス`` 参照をファイル内容に展開する。
 
-    Only files inside cwd are expanded; path traversal attempts (e.g. @../etc/passwd)
-    are silently left unchanged.
+    ``cwd`` の外部へのパス（例: ``@../etc/passwd``）は展開せずそのまま返す。
 
-    Example: '@src/foo.py explain this' expands the file inline before sending to the LLM.
+    :param text: ユーザーの入力テキスト。
+    :param cwd: 参照を解決する基準となる作業ディレクトリ。
+    :return: ``@パス`` をファイル内容に置換した文字列。
     """
     pattern = re.compile(r"@([\w./~-]+(?:/[\w./~-]*)*)")
     cwd_resolved = Path(cwd).resolve()
 
     def replace(match: re.Match) -> str:
+        # パストラバーサルガード: cwd の外側は展開しない
         ref = match.group(1)
         p = Path(ref) if Path(ref).is_absolute() else Path(cwd) / ref
         p = p.resolve()
-        # Reject paths that escape cwd (path traversal guard)
         try:
             p.relative_to(cwd_resolved)
         except ValueError:
@@ -48,7 +53,10 @@ def _expand_file_refs(text: str, cwd: str) -> str:
 
 
 def serve() -> None:
-    """Launch the web UI server."""
+    """Web UI サーバー（FastAPI）を起動する。
+
+    ``HOST`` / ``PORT`` 環境変数でバインドアドレスとポートを指定できる。
+    """
     load_dotenv()
     from .server import serve as _serve
 
@@ -59,6 +67,11 @@ def serve() -> None:
 
 
 def main() -> None:
+    """CLI エントリポイント。
+
+    ``--ui`` / ``-u`` フラグが渡された場合は Web UI サーバーを起動する。
+    それ以外はターミナルのインタラクティブ REPL として動作する。
+    """
     if "--ui" in sys.argv or "-u" in sys.argv:
         serve()
         return
@@ -112,6 +125,7 @@ def main() -> None:
     print("  Type your message, or 'exit' / Ctrl+C to quit.\n")
 
     async def _run() -> None:
+        """インタラクティブ REPL のメインループ（非同期）。"""
         try:
             while True:
                 try:

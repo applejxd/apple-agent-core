@@ -26,6 +26,10 @@ packages = ["src/my_agent_core"]
 
 [dependency-groups]
 dev = [
+    "furo>=2024.1.29",
+    "myst-parser>=3.0",
     "pytest>=9.0.2",
     "ruff>=0.15.5",
+    "sphinx>=8.0",
+    "sphinx-autodoc-typehints>=2.0",
 ]

@@ -1,15 +1,13 @@
-"""System prompt builder with Agentic Context Engineering support."""
+"""システムプロンプトビルダーモジュール（Agentic Context Engineering 対応）。
+
+cwd の AGENTS.md・USER.md・TOOLS.md・MEMORY.md・SYSTEM.md・.agent/instructions.md と
+グローバル設定ディレクトリのファイルを自動注入し、スキル一覧もシステムプロンプトに含める。
+"""
 
 from datetime import datetime
 from pathlib import Path
 
-# Files auto-injected into the system prompt (in order).
-# - AGENTS.md: project instructions
-# - USER.md: user profile and preferences
-# - TOOLS.md: local tool conventions and commands
-# - MEMORY.md: long-term memory and accumulated project knowledge
-# - SYSTEM.md: system-level config (pi-mono compatibility)
-# - .agent/instructions.md: additional per-project instructions
+#: システムプロンプトに自動注入するプロジェクトローカルファイル名リスト（優先度順）。
 CONTEXT_FILES = [
     "AGENTS.md",
     "USER.md",
@@ -19,16 +17,16 @@ CONTEXT_FILES = [
     ".agent/instructions.md",
 ]
 
-# Global files loaded from the user's config directory (first match wins).
-# These are merged before project-local files.
+#: グローバル設定ディレクトリから読み込むファイル名リスト。
 GLOBAL_FILES = ["AGENTS.md", "USER.md"]
 
-# Candidate directories for global context files (checked in order)
+#: グローバル設定ファイルを探索するディレクトリ候補（先頭から順に検索）。
 GLOBAL_CONFIG_DIRS = [
     Path.home() / ".config" / "my-agent-core",
     Path.home() / ".agents",
 ]
 
+#: エージェントへの基本指示文。ツール説明・ガイドラインを含む。
 BASE_PROMPT = """You are an expert coding assistant. You help users by reading files, executing commands, editing code, and writing new files.
 
 Available tools:
@@ -49,7 +47,11 @@ Guidelines:
 
 
 def _read_file(path: Path) -> str | None:
-    """Read a file and return its stripped content, or None on failure/empty."""
+    """ファイルを読み込んでトリム済み内容を返す。
+
+    :param path: 読み込むファイルパス。
+    :return: トリム済みのファイル内容。空またはエラー時は ``None``。
+    """
     try:
         content = path.read_text(errors="replace").strip()
         return content if content else None
@@ -58,10 +60,13 @@ def _read_file(path: Path) -> str | None:
 
 
 def _discover_skills(cwd: str) -> str | None:
-    """Scan .agent/skills/*.md and return a brief skill index, or None if empty.
+    """.agent/skills/*.md を走査してスキル一覧テキストを返す。
 
-    Only the first non-empty line of each file is used as the description,
-    so full skill content stays out of the system prompt (load on demand).
+    各ファイルの最初の非空行のみを説明として使用する。
+    シンボリックリンクや不正なファイル名はスキップする。
+
+    :param cwd: スキルディレクトリを探索する基準ディレクトリ。
+    :return: スキル一覧の文字列。スキルが見つからない場合は ``None``。
     """
     skills_dir = Path(cwd) / ".agent" / "skills"
     if not skills_dir.is_dir():
@@ -83,18 +88,26 @@ def _discover_skills(cwd: str) -> str | None:
                     break
         except OSError:
             pass
-        entries.append(f"- **{name}**: {description}" if description else f"- **{name}**")
+        entries.append(
+            f"- **{name}**: {description}" if description else f"- **{name}**"
+        )
 
     if not entries:
         return None
 
-    lines = ["Available skills (load full content with read('.agent/skills/<name>.md')):"]
+    lines = [
+        "Available skills (load full content with read('.agent/skills/<name>.md')):"
+    ]
     lines.extend(entries)
     return "\n".join(lines)
 
 
 def build_system_prompt(cwd: str) -> str:
-    """Build the system prompt, merging global and local context files."""
+    """グローバルおよびローカルのコンテキストファイルを結合してシステムプロンプトを構築する。
+
+    :param cwd: エージェントの作業ディレクトリ。
+    :return: 完成したシステムプロンプト文字列。
+    """
     prompt = BASE_PROMPT
 
     context_sections: list[str] = []

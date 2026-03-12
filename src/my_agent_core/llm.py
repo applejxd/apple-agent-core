@@ -1,3 +1,9 @@
+"""OpenRouter SSE ストリーミングを使った LLM クライアントモジュール。
+
+httpx を使って OpenRouter API と通信し、非同期ジェネレータとして
+テキストチャンクおよびツール呼び出しをストリーミングする。
+"""
+
 import asyncio
 import json
 import os
@@ -8,16 +14,34 @@ import httpx
 
 from .types import Message, ToolCall, ToolCallFunction
 
+#: OpenRouter API のエンドポイント URL。
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+#: デフォルトで使用する LLM モデル名。
 DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
+#: API リクエストの最大リトライ回数。
 MAX_RETRIES = 3
+
+#: リトライ時の待機秒数リスト（指数バックオフ）。
 RETRY_DELAYS = [1.0, 2.0, 4.0]
+
+#: リトライ対象とする HTTP ステータスコードのセット。
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class LLMClient:
+    """OpenRouter API クライアント。
+
+    SSE ストリーミングと自動リトライをサポートする非同期 LLM クライアント。
+    """
+
     def __init__(self, api_key: str, model: str = DEFAULT_MODEL) -> None:
+        """クライアントを初期化する。
+
+        :param api_key: OpenRouter の API キー。
+        :param model: 使用する LLM モデル名。デフォルトは :data:`DEFAULT_MODEL`。
+        """
         self.api_key = api_key
         self.model = model
         self._client = httpx.AsyncClient(
@@ -34,10 +58,14 @@ class LLMClient:
         messages: list[Message],
         tools: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[str | list[ToolCall], None]:
-        """Stream LLM response with automatic retry on transient errors.
+        """LLM レスポンスをストリーミングし、テキストチャンクまたはツール呼び出しを順次 yield する。
 
-        Retries up to MAX_RETRIES times with exponential backoff for HTTP
-        429 / 5xx errors and network-level transport errors.
+        トランジェントエラー（HTTP 429 / 5xx、ネットワークエラー）に対して
+        最大 :data:`MAX_RETRIES` 回まで指数バックオフでリトライする。
+
+        :param messages: LLM に送信する会話メッセージのリスト。
+        :param tools: LLM に提供するツール定義のリスト（省略可）。
+        :return: テキストチャンク（文字列）またはツール呼び出しリストを順次 yield する非同期ジェネレータ。
         """
         payload: dict[str, Any] = {
             "model": self.model,
@@ -141,10 +169,16 @@ class LLMClient:
                     raise
 
     async def close(self) -> None:
+        """HTTP クライアントを閉じてリソースを解放する。"""
         await self._client.aclose()
 
 
 def create_client() -> LLMClient:
+    """環境変数から設定を読み込んで LLMClient インスタンスを生成する。
+
+    :return: 設定済みの :class:`LLMClient` インスタンス。
+    :raises ValueError: ``OPENROUTER_API_KEY`` 環境変数が未設定の場合。
+    """
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
         raise ValueError("OPENROUTER_API_KEY environment variable is not set")

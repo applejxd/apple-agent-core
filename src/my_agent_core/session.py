@@ -1,4 +1,8 @@
-"""Session management: persist message history as JSON."""
+"""セッション管理モジュール。
+
+会話履歴を JSON ファイルとしてディスクに永続化し、セッションの
+ロード・セーブ・追記保存を提供する。
+"""
 
 import json
 import os
@@ -8,20 +12,24 @@ from pathlib import Path
 
 from .types import Message, Session
 
+#: セッション保存先ディレクトリを指定する環境変数名。
 SESSION_DIR_ENV = "SESSION_DIR"
+
+#: SESSION_DIR 未設定時のデフォルトセッション保存先ディレクトリ。
 DEFAULT_SESSION_BASE = str(
     Path.home() / ".local" / "share" / "my-agent-core" / "session"
 )
 
 
 def new_session_id() -> str:
-    """Generate a time-sortable, human-readable session ID.
+    """時刻順ソート可能な人間可読のセッション ID を生成する。
 
-    Format: YYYYMMDD-HHMMSS-<8 hex chars>  (UTC)
-    Example: 20260312-114537-a3b4c5d8
+    形式（UTC）: ``YYYYMMDD-HHMMSS-xxxxxxxx`` （16 進 8 文字のランダムサフィックス）
 
-    Lexicographic sort order equals chronological order, making workspace
-    directories easy to browse and manage.
+    辞書順ソートが時刻順ソートと一致するため、ワークスペースの
+    ディレクトリ管理が容易になる。
+
+    :return: 新しいセッション ID 文字列（例: ``20260312-114537-a3b4c5d8``）。
     """
     ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     suffix = uuid.uuid4().hex[:8]
@@ -29,12 +37,22 @@ def new_session_id() -> str:
 
 
 def _session_dir(session_id: str) -> Path:
+    """セッションのデータディレクトリパスを返す。
+
+    :param session_id: セッション ID。
+    :return: セッションデータを保存するディレクトリパス。
+    """
     base = os.environ.get(SESSION_DIR_ENV, DEFAULT_SESSION_BASE)
     return Path(base) / session_id
 
 
 def load_session(session_id: str, cwd: str) -> Session:
-    """Load an existing session or create a new one."""
+    """既存セッションを読み込む。存在しない場合は新規セッションを作成する。
+
+    :param session_id: 読み込むセッションの ID。
+    :param cwd: エージェントの作業ディレクトリ。
+    :return: 読み込まれた（または新規の） :class:`~my_agent_core.types.Session` インスタンス。
+    """
     session = Session(session_id=session_id, cwd=cwd)
     messages_file = _session_dir(session_id) / "messages.json"
 
@@ -52,7 +70,10 @@ def load_session(session_id: str, cwd: str) -> Session:
 
 
 def save_session(session: Session) -> None:
-    """Persist session messages to disk."""
+    """セッションのメッセージ履歴をディスクに保存する。
+
+    :param session: 保存するセッションインスタンス。
+    """
     d = _session_dir(session.session_id)
     d.mkdir(parents=True, exist_ok=True)
     messages_file = d / "messages.json"
@@ -64,6 +85,10 @@ def save_session(session: Session) -> None:
 
 
 def append_and_save(session: Session, message: Message) -> None:
-    """Append a message and immediately persist (crash-safe)."""
+    """メッセージをセッションに追記してすぐに永続化する（クラッシュセーフ）。
+
+    :param session: 追記対象のセッションインスタンス。
+    :param message: 追記するメッセージ。
+    """
     session.messages.append(message)
     save_session(session)
