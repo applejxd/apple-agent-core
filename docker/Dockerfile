@@ -11,6 +11,9 @@ COPY templates/ ./templates/
 # Install dependencies
 RUN uv sync --no-dev
 
+# Mark this image as running inside a container (prevents recursive Docker launch)
+ENV APPLE_AGENT_CONTAINER=1
+
 # Expose the API port
 EXPOSE 8000
 
