@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from my_agent_core.prompt import build_system_prompt, _discover_skills, CONTEXT_FILES
+from apple_agent_core.prompt import build_system_prompt, _discover_skills, CONTEXT_FILES
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ class TestBuildSystemPromptGlobal:
         project_dir.mkdir()
         _write(project_dir / "AGENTS.md", "Local agent instructions")
 
-        from my_agent_core import prompt as prompt_module
+        from apple_agent_core import prompt as prompt_module
 
         monkeypatch.setattr(prompt_module, "GLOBAL_CONFIG_DIRS", [global_dir])
 
@@ -177,7 +177,7 @@ class TestBuildSystemPromptGlobal:
         global_dir.mkdir()
         _write(global_dir / "USER.md", "Global user preferences")
 
-        from my_agent_core import prompt as prompt_module
+        from apple_agent_core import prompt as prompt_module
 
         monkeypatch.setattr(prompt_module, "GLOBAL_CONFIG_DIRS", [global_dir])
 
@@ -193,7 +193,7 @@ class TestBuildSystemPromptGlobal:
         _write(dir1 / "AGENTS.md", "From dir1")
         _write(dir2 / "AGENTS.md", "From dir2")
 
-        from my_agent_core import prompt as prompt_module
+        from apple_agent_core import prompt as prompt_module
 
         monkeypatch.setattr(prompt_module, "GLOBAL_CONFIG_DIRS", [dir1, dir2])
 

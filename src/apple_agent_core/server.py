@@ -29,7 +29,7 @@ HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>my-agent-core</title>
+<title>apple-agent-core</title>
 <style>
   :root {
     --bg: #0d1117;
@@ -216,7 +216,7 @@ HTML = """<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <span class="logo">⚡ my-agent-core</span>
+  <span class="logo">⚡ apple-agent-core</span>
   <span class="meta" id="meta">connecting...</span>
   <span class="dot" id="dot"></span>
 </header>
@@ -415,7 +415,7 @@ input.addEventListener('input', () => {
 # Server
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="my-agent-core")
+app = FastAPI(title="apple-agent-core")
 
 _clients: dict[str, LLMClient] = {}
 
@@ -423,7 +423,7 @@ _clients: dict[str, LLMClient] = {}
 def get_client() -> LLMClient:
     """API キーとモデルをキーとしてキャッシュした LLMClient を返す。
 
-    :return: キャッシュ済みの :class:`~my_agent_core.llm.LLMClient` インスタンス。
+    :return: キャッシュ済みの :class:`~apple_agent_core.llm.LLMClient` インスタンス。
     :raises ValueError: ``OPENROUTER_API_KEY`` 環境変数が未設定の場合。
     """
     key = os.environ.get("OPENROUTER_API_KEY", "")

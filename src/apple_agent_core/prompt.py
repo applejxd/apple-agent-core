@@ -22,7 +22,7 @@ GLOBAL_FILES = ["AGENTS.md", "USER.md"]
 
 #: グローバル設定ファイルを探索するディレクトリ候補（先頭から順に検索）。
 GLOBAL_CONFIG_DIRS = [
-    Path.home() / ".config" / "my-agent-core",
+    Path.home() / ".config" / "apple-agent-core",
     Path.home() / ".agents",
 ]
 

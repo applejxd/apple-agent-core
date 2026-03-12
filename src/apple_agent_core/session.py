@@ -32,7 +32,7 @@ def load_session(session_id: str, cwd: str) -> Session:
 
     :param session_id: 読み込むセッションの ID。
     :param cwd: エージェントの作業ディレクトリ。
-    :return: 読み込まれた（または新規の） :class:`~my_agent_core.types.Session` インスタンス。
+    :return: 読み込まれた（または新規の） :class:`~apple_agent_core.types.Session` インスタンス。
     """
     session = Session(session_id=session_id, cwd=cwd)
     messages_file = get_session_dir(session_id) / "messages.json"

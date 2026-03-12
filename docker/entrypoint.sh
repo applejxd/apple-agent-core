@@ -12,4 +12,4 @@ if [ "${UI_MODE}" = "1" ] || echo "$@" | grep -q "\-\-ui"; then
     exec uv run --project /app agent-ui
 fi
 
-exec uv run --project /app python -m my_agent_core "$@"
+exec uv run --project /app python -m apple_agent_core "$@"

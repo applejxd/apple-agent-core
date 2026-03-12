@@ -13,9 +13,9 @@ _demo_dst.parent.mkdir(exist_ok=True)
 if _demo_src.exists():
     shutil.copy2(_demo_src, _demo_dst)
 
-project = "my-agent-core"
-author = "my-agent-core contributors"
-copyright = "2024, my-agent-core contributors"
+project = "apple-agent-core"
+author = "apple-agent-core contributors"
+copyright = "2026, apple-agent-core contributors"
 release = "0.1.0"
 
 extensions = [

@@ -1,4 +1,4 @@
-# my-agent-core
+# apple-agent-core
 
 ![demo](docs/demo.png)
 
@@ -35,13 +35,13 @@ uv run agent --ui
 
 ```bash
 # ビルド
-docker build -f docker/Dockerfile -t my-agent-core .
+docker build -f docker/Dockerfile -t apple-agent-core .
 
 # ターミナル CLI モード
 docker run -it \
   -e OPENROUTER_API_KEY="sk-..." \
   -v /path/to/your/project:/workspace \
-  my-agent-core
+  apple-agent-core
 
 # Web UI モード（http://localhost:8000 をブラウザで開く）
 docker run -it \
@@ -49,7 +49,7 @@ docker run -it \
   -e UI_MODE=1 \
   -p 8000:8000 \
   -v /path/to/your/project:/workspace \
-  my-agent-core
+  apple-agent-core
 ```
 
 初回起動時に `/workspace/AGENTS.md` テンプレートが自動配置されます。
@@ -75,7 +75,7 @@ docker run -it \
 | `SYSTEM.md` | システム設定（pi-mono 互換） | ✗ |
 | `.agent/instructions.md` | 追加の詳細指示 | ✗ |
 
-`~/.config/my-agent-core/` または `~/.agents/` にグローバルファイル（`AGENTS.md`, `USER.md`）を置くと、全プロジェクト共通の設定として自動読み込みされます。
+`~/.config/apple-agent-core/` または `~/.agents/` にグローバルファイル（`AGENTS.md`, `USER.md`）を置くと、全プロジェクト共通の設定として自動読み込みされます。
 
 ### オンデマンド・スキル
 
@@ -85,7 +85,7 @@ docker run -it \
 ## ファイル構成
 
 ```
-src/my_agent_core/
+src/apple_agent_core/
 ├── types.py    # Message/Session dataclass
 ├── tools.py    # read/write/edit/bash 実装
 ├── llm.py      # OpenRouter SSE streaming client

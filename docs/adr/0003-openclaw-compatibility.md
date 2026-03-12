@@ -6,7 +6,7 @@
 
 ## 背景
 
-このリポジトリ（my-agent-core）の ACE は、ワークスペース内の Markdown ファイルをシステムプロンプトに注入する仕組みで動作する。pi-mono（pi-coding-agent）と OpenClaw を DeepWiki で調査した結果、類似のエコシステムが複数存在し、各プロジェクトが独自のファイル命名規則を持つことが確認された。
+このリポジトリ（apple-agent-core）の ACE は、ワークスペース内の Markdown ファイルをシステムプロンプトに注入する仕組みで動作する。pi-mono（pi-coding-agent）と OpenClaw を DeepWiki で調査した結果、類似のエコシステムが複数存在し、各プロジェクトが独自のファイル命名規則を持つことが確認された。
 
 本 ADR では、これらの調査を踏まえてどのファイルを採用・不採用とするかを確定し、全体のロジック設計を記録する。
 
@@ -35,7 +35,7 @@
 | `SYSTEM.md` | システム設定（pi-mono 互換） | ✗ | 既存 |
 | `.agent/instructions.md` | 追加の詳細指示 | ✗ | 既存 |
 
-グローバルファイル（`~/.config/my-agent-core/` または `~/.agents/`）は `AGENTS.md` と `USER.md` のみ。プロジェクト設定より先に読み込まれる。
+グローバルファイル（`~/.config/apple-agent-core/` または `~/.agents/`）は `AGENTS.md` と `USER.md` のみ。プロジェクト設定より先に読み込まれる。
 
 ### 不採用
 

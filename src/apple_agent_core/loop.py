@@ -46,7 +46,7 @@ def _trim_messages(
 async def run_loop(client: LLMClient, session: Session, system_prompt: str) -> None:
     """ツール呼び出しがなくなるまでエージェントループを実行する。
 
-    :param client: LLM との通信に使用する :class:`~my_agent_core.llm.LLMClient`。
+    :param client: LLM との通信に使用する :class:`~apple_agent_core.llm.LLMClient`。
     :param session: 現在の会話セッション。
     :param system_prompt: LLM に渡すシステムプロンプト文字列。
     """

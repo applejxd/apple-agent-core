@@ -38,6 +38,6 @@ format = "uv run ruff format ."
 # Build (package)
 build = "uv build"
 # Docker helpers (optional)
-docker-build = "docker build -f docker/Dockerfile -t my-agent-core ."
+docker-build = "docker build -f docker/Dockerfile -t apple-agent-core ."
 # docker-run uses shell expansion for current directory; run manually if needed
-docker-run = "docker run --rm -it -e OPENROUTER_API_KEY=$OPENROUTER_API_KEY -v $(pwd):/workspace my-agent-core"
+docker-run = "docker run --rm -it -e OPENROUTER_API_KEY=$OPENROUTER_API_KEY -v $(pwd):/workspace apple-agent-core"

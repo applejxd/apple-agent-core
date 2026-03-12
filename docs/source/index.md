@@ -1,8 +1,8 @@
-# my-agent-core
+# apple-agent-core
 
 ```{image} /_static/demo.png
 :width: 100%
-:alt: my-agent-core demo screenshot
+:alt: apple-agent-core demo screenshot
 ```
 
 ```{include} ../../README.md

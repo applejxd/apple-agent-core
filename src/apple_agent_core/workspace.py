@@ -141,7 +141,7 @@ def prepare_agent(session_id: str) -> tuple[str, object, str]:
     :param session_id: 準備対象のセッション ID。
     :return: ``(cwd, session, system_prompt)`` のタプル。
         ``cwd`` はエージェントの作業ディレクトリ（絶対パス文字列）、
-        ``session`` は :class:`~my_agent_core.types.Session` インスタンス、
+        ``session`` は :class:`~apple_agent_core.types.Session` インスタンス、
         ``system_prompt`` はシステムプロンプト文字列。
     """
     # 循環インポートを避けるため遅延インポートを使用する

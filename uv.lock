@@ -654,7 +654,7 @@ wheels = [
 ]
 
 [[package]]
-name = "my-agent-core"
+name = "apple-agent-core"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

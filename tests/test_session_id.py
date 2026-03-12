@@ -4,7 +4,7 @@ import re
 import time
 from datetime import UTC, datetime
 
-from my_agent_core.session import new_session_id
+from apple_agent_core.session import new_session_id
 
 SESSION_ID_PATTERN = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{8}$")
 

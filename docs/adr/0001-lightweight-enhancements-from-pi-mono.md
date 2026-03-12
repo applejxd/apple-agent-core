@@ -7,7 +7,7 @@
 承認 (Accepted)
 
 ## コンテキスト
-`my-agent-core` は、オリジナルの `pi-coding-agent` (badlogic/pi-mono) が提唱する「超シンプル」なエージェント・コアの概念を忠実に再現した軽量な Python 実装です。現在は `read`, `write`, `edit`, `bash` の 4 つの基礎ツールと、Markdown ファイルを用いたコンテキスト注入の仕組みを持っています。
+`apple-agent-core` は、オリジナルの `pi-coding-agent` (badlogic/pi-mono) が提唱する「超シンプル」なエージェント・コアの概念を忠実に再現した軽量な Python 実装です。現在は `read`, `write`, `edit`, `bash` の 4 つの基礎ツールと、Markdown ファイルを用いたコンテキスト注入の仕組みを持っています。
 
 この「軽量さ・シンプルさ」を損なうことなく、実用性やUX、推論の堅牢性を高めるために、オリジナルの `pi-coding-agent` からいくつかの機能を取り入れる必要があります。しかし、TypeScript 版の持つ複雑な拡張モジュール機構や依存パッケージ（`diff` など）をそのまま持ち込むことは設計思想に反します。
 
@@ -22,7 +22,7 @@ Python のコアモジュールや既存の枠組みで実装可能な範囲と�
    * `.agent/skills/*.md` などのファイルを `read` ツールで読み込む方針を明示。
 
 2. **コンテキスト情報の階層的ロード (Hierarchical Context)**
-   * グローバル（`~/.config/my-agent-core/AGENTS.md` または `~/.agents/AGENTS.md`）を
+   * グローバル（`~/.config/apple-agent-core/AGENTS.md` または `~/.agents/AGENTS.md`）を
      プロジェクトローカル（`cwd/AGENTS.md`）より先に読み込んで結合。
 
 3. **インライン・ファイル注入 (`@file` シンタックス)**

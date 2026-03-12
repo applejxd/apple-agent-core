@@ -1,5 +1,5 @@
 [project]
-name = "my-agent-core"
+name = "apple-agent-core"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
@@ -14,15 +14,15 @@ dependencies = [
 ]
 
 [project.scripts]
-agent = "my_agent_core.main:main"
-agent-ui = "my_agent_core.main:serve"
+agent = "apple_agent_core.main:main"
+agent-ui = "apple_agent_core.main:serve"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/my_agent_core"]
+packages = ["src/apple_agent_core"]
 
 [dependency-groups]
 dev = [

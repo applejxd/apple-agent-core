@@ -47,8 +47,8 @@ class LLMClient:
         self._client = httpx.AsyncClient(
             headers={
                 "Authorization": f"Bearer {api_key}",
-                "HTTP-Referer": "https://github.com/my-agent-core",
-                "X-Title": "my-agent-core",
+                "HTTP-Referer": "https://github.com/apple-agent-core",
+                "X-Title": "apple-agent-core",
             },
             timeout=300.0,
         )

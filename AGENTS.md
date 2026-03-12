@@ -1,4 +1,4 @@
-# my-agent-core
+# apple-agent-core
 
 pi-coding-agent の Python (uv) 超シンプル版。OpenRouter API を使い、read/write/edit/bash の 4 ツールで動作する AI コーディングエージェント。CLI モードと Web UI（FastAPI + WebSocket）の両方を提供する。
 
@@ -21,7 +21,7 @@ uv run ruff format .     # フォーマット
 
 ## Project Structure
 
-- `src/my_agent_core/` — エージェント本体
+- `src/apple_agent_core/` — エージェント本体
   - `types.py`   — Message/Session dataclass
   - `tools.py`   — 4 ツール実装（JSON Schema 付き）
   - `llm.py`     — OpenRouter SSE streaming client

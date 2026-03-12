@@ -1,4 +1,4 @@
-"""my-agent-core パッケージ。
+"""apple-agent-core パッケージ。
 
 OpenRouter API を使った AI コーディングエージェント。
 read / write / edit / bash の 4 ツールで動作し、

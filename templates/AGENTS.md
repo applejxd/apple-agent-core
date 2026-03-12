@@ -54,7 +54,7 @@ uv run ruff check .
 | `SYSTEM.md` | システム設定（pi-mono 互換） | ✗ |
 | `.agent/instructions.md` | 追加の詳細指示 | ✗ |
 
-グローバルファイル（`~/.config/my-agent-core/` または `~/.agents/`）はプロジェクト設定より先に読み込まれ、全プロジェクト共通の設定として機能します。
+グローバルファイル（`~/.config/apple-agent-core/` または `~/.agents/`）はプロジェクト設定より先に読み込まれ、全プロジェクト共通の設定として機能します。
 
 ### オンデマンド・スキル
 

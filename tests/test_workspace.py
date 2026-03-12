@@ -3,8 +3,8 @@
 from pathlib import Path
 
 
-from my_agent_core.types import Session
-from my_agent_core.workspace import (
+from apple_agent_core.types import Session
+from apple_agent_core.workspace import (
     DEFAULT_WORKSPACE_BASE,
     WORKSPACE_BASE_ENV,
     get_files_dir,

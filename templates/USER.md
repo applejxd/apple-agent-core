@@ -1,7 +1,7 @@
 # User Profile (USER.md)
 
 <!-- このファイルはエージェントが全プロジェクト共通で参照するユーザープロファイルです。
-     ~/.config/my-agent-core/USER.md または ~/.agents/USER.md として配置すると
+     ~/.config/apple-agent-core/USER.md または ~/.agents/USER.md として配置すると
      グローバル設定として自動注入されます。プロジェクトルートに置くと
      プロジェクト固有の上書き設定として機能します。 -->
 

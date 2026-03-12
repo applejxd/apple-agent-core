@@ -61,7 +61,7 @@ def serve() -> None:
 
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
-    print(f"\033[1;32m[my-agent-core]\033[0m Web UI → http://localhost:{port}")
+    print(f"\033[1;32m[apple-agent-core]\033[0m Web UI → http://localhost:{port}")
     _serve(host=host, port=port)
 
 
@@ -90,7 +90,7 @@ def main() -> None:
 
     workspace_path = get_workspace_base() / session_id
     print(
-        f"\033[1;32m[my-agent-core]\033[0m session={session.session_id} model={client.model}"
+        f"\033[1;32m[apple-agent-core]\033[0m session={session.session_id} model={client.model}"
     )
     print(f"  workspace={workspace_path.absolute()}")
     print(f"  cwd={cwd}")
