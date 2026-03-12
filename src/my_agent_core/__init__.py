@@ -11,6 +11,13 @@ from .prompt import build_system_prompt
 from .session import append_and_save, load_session, new_session_id, save_session
 from .tools import TOOL_DEFINITIONS, execute_tool
 from .types import Message, Session
+from .workspace import (
+    WorkspaceInfo,
+    get_workspace_base,
+    list_sessions,
+    prepare_agent,
+    setup_workspace,
+)
 
 __all__ = [
     "LLMClient",
@@ -25,4 +32,9 @@ __all__ = [
     "execute_tool",
     "Message",
     "Session",
+    "WorkspaceInfo",
+    "get_workspace_base",
+    "setup_workspace",
+    "list_sessions",
+    "prepare_agent",
 ]

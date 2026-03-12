@@ -9,6 +9,7 @@ from my_agent_core.prompt import build_system_prompt, _discover_skills, CONTEXT_
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
@@ -17,6 +18,7 @@ def _write(path: Path, content: str) -> None:
 # ---------------------------------------------------------------------------
 # _discover_skills
 # ---------------------------------------------------------------------------
+
 
 class TestDiscoverSkills:
     def test_no_skills_dir(self, tmp_path):
@@ -74,6 +76,7 @@ class TestDiscoverSkills:
 # ---------------------------------------------------------------------------
 # build_system_prompt — local context files
 # ---------------------------------------------------------------------------
+
 
 class TestBuildSystemPromptLocal:
     def test_no_context_files(self, tmp_path):
@@ -144,6 +147,7 @@ class TestBuildSystemPromptLocal:
 # build_system_prompt — global context files
 # ---------------------------------------------------------------------------
 
+
 class TestBuildSystemPromptGlobal:
     def test_global_agents_md_merged(self, tmp_path, monkeypatch):
         """Global AGENTS.md is prepended before local context."""
@@ -156,13 +160,16 @@ class TestBuildSystemPromptGlobal:
         _write(project_dir / "AGENTS.md", "Local agent instructions")
 
         from my_agent_core import prompt as prompt_module
+
         monkeypatch.setattr(prompt_module, "GLOBAL_CONFIG_DIRS", [global_dir])
 
         result = build_system_prompt(str(project_dir))
         assert "Global agent instructions" in result
         assert "Local agent instructions" in result
         # Global appears before local in the prompt
-        assert result.index("Global agent instructions") < result.index("Local agent instructions")
+        assert result.index("Global agent instructions") < result.index(
+            "Local agent instructions"
+        )
 
     def test_global_user_md_merged(self, tmp_path, monkeypatch):
         """Global USER.md is loaded alongside global AGENTS.md."""
@@ -171,6 +178,7 @@ class TestBuildSystemPromptGlobal:
         _write(global_dir / "USER.md", "Global user preferences")
 
         from my_agent_core import prompt as prompt_module
+
         monkeypatch.setattr(prompt_module, "GLOBAL_CONFIG_DIRS", [global_dir])
 
         result = build_system_prompt(str(tmp_path / "project"))
@@ -186,6 +194,7 @@ class TestBuildSystemPromptGlobal:
         _write(dir2 / "AGENTS.md", "From dir2")
 
         from my_agent_core import prompt as prompt_module
+
         monkeypatch.setattr(prompt_module, "GLOBAL_CONFIG_DIRS", [dir1, dir2])
 
         result = build_system_prompt(str(tmp_path / "project"))

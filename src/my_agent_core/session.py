@@ -5,20 +5,11 @@
 """
 
 import json
-import os
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 
 from .types import Message, Session
-
-#: セッション保存先ディレクトリを指定する環境変数名。
-SESSION_DIR_ENV = "SESSION_DIR"
-
-#: SESSION_DIR 未設定時のデフォルトセッション保存先ディレクトリ。
-DEFAULT_SESSION_BASE = str(
-    Path.home() / ".local" / "share" / "my-agent-core" / "session"
-)
+from .workspace import get_session_dir
 
 
 def new_session_id() -> str:
@@ -36,16 +27,6 @@ def new_session_id() -> str:
     return f"{ts}-{suffix}"
 
 
-def _session_dir(session_id: str) -> Path:
-    """セッションのデータディレクトリパスを返す。
-
-    :param session_id: セッション ID。
-    :return: セッションデータを保存するディレクトリパス。
-    """
-    base = os.environ.get(SESSION_DIR_ENV, DEFAULT_SESSION_BASE)
-    return Path(base) / session_id
-
-
 def load_session(session_id: str, cwd: str) -> Session:
     """既存セッションを読み込む。存在しない場合は新規セッションを作成する。
 
@@ -54,7 +35,7 @@ def load_session(session_id: str, cwd: str) -> Session:
     :return: 読み込まれた（または新規の） :class:`~my_agent_core.types.Session` インスタンス。
     """
     session = Session(session_id=session_id, cwd=cwd)
-    messages_file = _session_dir(session_id) / "messages.json"
+    messages_file = get_session_dir(session_id) / "messages.json"
 
     if messages_file.exists():
         try:
@@ -74,7 +55,7 @@ def save_session(session: Session) -> None:
 
     :param session: 保存するセッションインスタンス。
     """
-    d = _session_dir(session.session_id)
+    d = get_session_dir(session.session_id)
     d.mkdir(parents=True, exist_ok=True)
     messages_file = d / "messages.json"
     messages_file.write_text(

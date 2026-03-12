@@ -7,7 +7,6 @@ WebUI（FastAPI サーバー）の起動にも対応する。
 import asyncio
 import os
 import re
-import shutil
 import sys
 from pathlib import Path
 
@@ -15,9 +14,9 @@ from dotenv import load_dotenv
 
 from .llm import create_client
 from .loop import run_loop
-from .prompt import build_system_prompt
-from .session import append_and_save, load_session, new_session_id
+from .session import append_and_save, new_session_id
 from .types import Message
+from .workspace import get_workspace_base, prepare_agent
 
 
 def _expand_file_refs(text: str, cwd: str) -> str:
@@ -80,36 +79,8 @@ def main() -> None:
     # 1. Determine Session ID
     session_id = os.environ.get("SESSION_ID") or new_session_id()
 
-    # 2. Setup Session Workspace
-    # We use a base 'workspace' directory, partitioned by session_id
-    base_workspace = Path("workspace") / session_id
-    files_dir = base_workspace / "files"
-    session_dir = base_workspace / "session"
-
-    is_new_session = not files_dir.exists()
-
-    files_dir.mkdir(parents=True, exist_ok=True)
-    session_dir.mkdir(parents=True, exist_ok=True)
-
-    # 2.5 Copy templates to the workspace if it's a new session
-    if is_new_session:
-        templates_src = Path("templates")
-        if templates_src.exists() and templates_src.is_dir():
-            print(f"[main] Initializing workspace with templates from {templates_src}")
-            for item in templates_src.iterdir():
-                if item.is_file():
-                    shutil.copy2(item, files_dir / item.name)
-                elif item.is_dir():
-                    shutil.copytree(item, files_dir / item.name, dirs_exist_ok=True)
-
-    # 3. Configure paths for the app
-    # Set SESSION_DIR env for session.py to pick up
-    os.environ["SESSION_DIR"] = str(session_dir.absolute())
-    # Set cwd for the agent to the 'files' directory
-    cwd = str(files_dir.absolute())
-
-    session = load_session(session_id, cwd)
-    system_prompt = build_system_prompt(cwd)
+    # 2. Setup workspace, load session, build system prompt
+    cwd, session, system_prompt = prepare_agent(session_id)
 
     try:
         client = create_client()
@@ -117,10 +88,11 @@ def main() -> None:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
+    workspace_path = get_workspace_base() / session_id
     print(
         f"\033[1;32m[my-agent-core]\033[0m session={session.session_id} model={client.model}"
     )
-    print(f"  workspace={base_workspace.absolute()}")
+    print(f"  workspace={workspace_path.absolute()}")
     print(f"  cwd={cwd}")
     print("  Type your message, or 'exit' / Ctrl+C to quit.\n")
 

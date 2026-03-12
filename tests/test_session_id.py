@@ -12,7 +12,9 @@ SESSION_ID_PATTERN = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{8}$")
 class TestNewSessionId:
     def test_format(self):
         sid = new_session_id()
-        assert SESSION_ID_PATTERN.match(sid), f"ID '{sid}' does not match expected format"
+        assert SESSION_ID_PATTERN.match(sid), (
+            f"ID '{sid}' does not match expected format"
+        )
 
     def test_length(self):
         sid = new_session_id()
@@ -25,7 +27,9 @@ class TestNewSessionId:
     def test_utc_date_matches_today(self):
         today_utc = datetime.now(UTC).strftime("%Y%m%d")
         sid = new_session_id()
-        assert sid.startswith(today_utc), f"ID '{sid}' does not start with today's UTC date {today_utc}"
+        assert sid.startswith(today_utc), (
+            f"ID '{sid}' does not start with today's UTC date {today_utc}"
+        )
 
     def test_lexicographic_order_equals_chronological(self):
         id1 = new_session_id()

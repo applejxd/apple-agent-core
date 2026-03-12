@@ -7,17 +7,18 @@ WebSocket 経由でエージェントループとリアルタイム通信する�
 import asyncio
 import json
 import os
-from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 from .llm import LLMClient, create_client
-from .prompt import build_system_prompt
-from .session import append_and_save, load_session, new_session_id
+from .session import append_and_save, new_session_id
 from .tools import TOOL_DEFINITIONS, execute_tool
 from .types import Message, Session
+from .workspace import get_session_dir
+from .workspace import list_sessions as ws_list_sessions
+from .workspace import prepare_agent
 
 # ---------------------------------------------------------------------------
 # HTML UI (embedded)
@@ -444,27 +445,18 @@ async def index() -> str:
 
 @app.get("/api/sessions")
 async def list_sessions() -> dict[str, Any]:
-    """SESSION_DIR 内のセッション一覧を返す。
+    """保存済みセッションの一覧を返す。
 
     :return: セッション情報（ID・メッセージ件数）のリストを含む辞書。
     """
-    session_base = os.environ.get("SESSION_DIR", "/workspace/.session")
-    base = Path(session_base)
     sessions = []
-    if base.exists():
-        for d in sorted(base.iterdir()):
-            msgs_file = d / "messages.json"
-            if msgs_file.exists():
-                try:
-                    data = json.loads(msgs_file.read_text())
-                    sessions.append(
-                        {
-                            "id": d.name,
-                            "message_count": len(data),
-                        }
-                    )
-                except Exception:
-                    pass
+    for session_id in ws_list_sessions():
+        msgs_file = get_session_dir(session_id) / "messages.json"
+        try:
+            data = json.loads(msgs_file.read_text())
+            sessions.append({"id": session_id, "message_count": len(data)})
+        except Exception:
+            pass
     return {"sessions": sessions}
 
 
@@ -485,9 +477,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
     :param session_id: 接続するセッションの ID。
     """
     await websocket.accept()
-    cwd = os.environ.get("WORKSPACE_DIR", os.getcwd())
-    session = load_session(session_id, cwd)
-    system_prompt = build_system_prompt(cwd)
+    cwd, session, system_prompt = prepare_agent(session_id)
 
     try:
         client = get_client()
