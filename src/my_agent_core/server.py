@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 
 from .llm import LLMClient, create_client
 from .prompt import build_system_prompt
-from .session import append_and_save, load_session
+from .session import append_and_save, load_session, new_session_id
 from .tools import TOOL_DEFINITIONS, execute_tool
 from .types import Message, Session
 
@@ -233,9 +233,7 @@ const sendBtn = document.getElementById('send');
 const meta = document.getElementById('meta');
 const dot = document.getElementById('dot');
 
-const sessionId = new URLSearchParams(location.search).get('session') || crypto.randomUUID();
-history.replaceState({}, '', `?session=${sessionId}`);
-
+let sessionId;
 let ws;
 let streaming = false;
 let currentBubble = null;
@@ -387,7 +385,22 @@ input.addEventListener('input', () => {
   input.style.height = Math.min(input.scrollHeight, 200) + 'px';
 });
 
-connect();
+(async () => {
+  const fromUrl = new URLSearchParams(location.search).get('session');
+  if (fromUrl) {
+    sessionId = fromUrl;
+  } else {
+    try {
+      const resp = await fetch('/api/new-session');
+      const data = await resp.json();
+      sessionId = data.session_id;
+    } catch {
+      sessionId = crypto.randomUUID();
+    }
+  }
+  history.replaceState({}, '', `?session=${sessionId}`);
+  connect();
+})();
 </script>
 </body>
 </html>
@@ -437,6 +450,12 @@ async def list_sessions() -> dict[str, Any]:
                 except Exception:
                     pass
     return {"sessions": sessions}
+
+
+@app.get("/api/new-session")
+async def api_new_session() -> dict[str, str]:
+    """Return a new time-sortable session ID."""
+    return {"session_id": new_session_id()}
 
 
 @app.websocket("/ws/{session_id}")

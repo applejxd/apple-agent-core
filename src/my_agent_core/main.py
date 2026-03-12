@@ -5,7 +5,6 @@ import os
 import re
 import shutil
 import sys
-import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -13,7 +12,7 @@ from dotenv import load_dotenv
 from .llm import create_client
 from .loop import run_loop
 from .prompt import build_system_prompt
-from .session import append_and_save, load_session
+from .session import append_and_save, load_session, new_session_id
 from .types import Message
 
 
@@ -66,7 +65,7 @@ def main() -> None:
     load_dotenv()
 
     # 1. Determine Session ID
-    session_id = os.environ.get("SESSION_ID") or str(uuid.uuid4())
+    session_id = os.environ.get("SESSION_ID") or new_session_id()
 
     # 2. Setup Session Workspace
     # We use a base 'workspace' directory, partitioned by session_id

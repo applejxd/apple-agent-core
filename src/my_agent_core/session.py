@@ -2,6 +2,8 @@
 
 import json
 import os
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .types import Message, Session
@@ -10,6 +12,20 @@ SESSION_DIR_ENV = "SESSION_DIR"
 DEFAULT_SESSION_BASE = str(
     Path.home() / ".local" / "share" / "my-agent-core" / "session"
 )
+
+
+def new_session_id() -> str:
+    """Generate a time-sortable, human-readable session ID.
+
+    Format: YYYYMMDD-HHMMSS-<8 hex chars>  (UTC)
+    Example: 20260312-114537-a3b4c5d8
+
+    Lexicographic sort order equals chronological order, making workspace
+    directories easy to browse and manage.
+    """
+    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    suffix = uuid.uuid4().hex[:8]
+    return f"{ts}-{suffix}"
 
 
 def _session_dir(session_id: str) -> Path:
