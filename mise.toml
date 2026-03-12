@@ -2,5 +2,5 @@
 uv = "latest"
 
 [env]
-OPENROUTER_API_KEY = "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"
+_.file = '.env'
 MODEL = "stepfun/step-3.5-flash:free"

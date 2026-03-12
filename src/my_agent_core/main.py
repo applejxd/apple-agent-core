@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import shutil
 import sys
 import uuid
 from pathlib import Path
@@ -40,8 +41,21 @@ def main() -> None:
     files_dir = base_workspace / "files"
     session_dir = base_workspace / "session"
 
+    is_new_session = not files_dir.exists()
+
     files_dir.mkdir(parents=True, exist_ok=True)
     session_dir.mkdir(parents=True, exist_ok=True)
+
+    # 2.5 Copy templates to the workspace if it's a new session
+    if is_new_session:
+        templates_src = Path("templates")
+        if templates_src.exists() and templates_src.is_dir():
+            print(f"[main] Initializing workspace with templates from {templates_src}")
+            for item in templates_src.iterdir():
+                if item.is_file():
+                    shutil.copy2(item, files_dir / item.name)
+                elif item.is_dir():
+                    shutil.copytree(item, files_dir / item.name, dirs_exist_ok=True)
 
     # 3. Configure paths for the app
     # Set SESSION_DIR env for session.py to pick up

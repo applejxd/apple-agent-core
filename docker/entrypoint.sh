@@ -3,16 +3,9 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE_DIR:-/workspace}"
-
-# Place AGENTS.md template if not already present
-if [ ! -f "$WORKSPACE/AGENTS.md" ]; then
-    echo "[entrypoint] Placing AGENTS.md template in $WORKSPACE"
-    cp /app/templates/AGENTS.md "$WORKSPACE/AGENTS.md"
-fi
-
-echo "[entrypoint] Starting agent in $WORKSPACE"
-cd "$WORKSPACE"
+# The agent now handles workspace/session setup and template copying internally via main.py.
+# We just need to ensure we are in the app directory to run the module correctly.
+cd /app
 
 # UI_MODE=1 or --ui flag → launch web UI server
 if [ "${UI_MODE}" = "1" ] || echo "$@" | grep -q "\-\-ui"; then

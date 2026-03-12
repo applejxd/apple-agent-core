@@ -11,15 +11,10 @@ COPY templates/ ./templates/
 # Install dependencies
 RUN uv sync --no-dev
 
-WORKDIR /workspace
+# Expose the API port
+EXPOSE 8000
 
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-ENV WORKSPACE_DIR=/workspace/files \
-    SESSION_DIR=/workspace/session \
-    PORT=8000
-
-EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]
