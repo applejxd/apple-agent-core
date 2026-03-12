@@ -1,17 +1,43 @@
 """Core agent loop: LLM call → tool execution → repeat."""
 
-import sys
-from typing import Any
-
 from .llm import LLMClient
 from .session import Session, append_and_save
 from .tools import TOOL_DEFINITIONS, execute_tool
 from .types import Message, ToolCall
 
+MAX_CONTEXT_MESSAGES = 40  # max non-system messages kept in context window
+
+
+def _trim_messages(
+    messages: list[Message], max_count: int = MAX_CONTEXT_MESSAGES
+) -> list[Message]:
+    """Trim message list to max_count, removing oldest turns first.
+
+    Removal is done at turn boundaries (user → assistant → tool results)
+    so the LLM always receives a structurally valid conversation.
+    """
+    if len(messages) <= max_count:
+        return messages
+
+    trimmed = list(messages)
+    while len(trimmed) > max_count:
+        # Drop the first message
+        trimmed.pop(0)
+        # Keep removing until we land on a user message (start of a turn)
+        while trimmed and trimmed[0].role != "user":
+            trimmed.pop(0)
+
+    # Fallback: if no user-message boundary was found, return the last max_count messages
+    if not trimmed:
+        return messages[-max_count:]
+
+    return trimmed
+
 
 async def run_loop(client: LLMClient, session: Session, system_prompt: str) -> None:
     """Run the agent loop until the LLM makes no more tool calls."""
-    messages = [Message(role="system", content=system_prompt)] + session.messages
+    context = _trim_messages(session.messages)
+    messages = [Message(role="system", content=system_prompt)] + context
 
     while True:
         text_chunks: list[str] = []

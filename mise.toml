@@ -7,11 +7,11 @@ _.file = '.env'
 
 # 無料モデル：256K context length, free
 # see https://openrouter.ai/stepfun/step-3.5-flash:free
-# MODEL = "stepfun/step-3.5-flash:free"
+MODEL = "stepfun/step-3.5-flash:free"
 
 # ツール対応モデル：41K context length, $0.08 input
 # see https://openrouter.ai/qwen/qwen3-32b
-MODEL = "qwen/qwen3-32b"
+# MODEL = "qwen/qwen3-32b"
 
 # 会話向けモデル：131.1K context length, $0.03 input
 # see https://openrouter.ai/openai/gpt-oss-20b
@@ -20,3 +20,24 @@ MODEL = "qwen/qwen3-32b"
 # 小規模モデル：16.4K context length, $0.02 input
 # see https://openrouter.ai/meta-llama/llama-3.1-8b-instruct
 # MODEL = "meta-llama/llama-3.1-8b-instruct"
+
+[tasks]
+# Install / sync dependencies
+sync = "uv sync"
+# Start CLI agent (terminal)
+agent = "uv run agent"
+# Start Web UI (http://localhost:8000)
+agent-ui = "uv run agent-ui"
+# Start Web UI via agent entrypoint
+agent-ui-cli = "uv run agent --ui"
+# Run tests
+test = "uv run pytest"
+# Lint and format
+lint = "uv run ruff check ."
+format = "uv run ruff format ."
+# Build (package)
+build = "uv build"
+# Docker helpers (optional)
+docker-build = "docker build -f docker/Dockerfile -t my-agent-core ."
+# docker-run uses shell expansion for current directory; run manually if needed
+docker-run = "docker run --rm -it -e OPENROUTER_API_KEY=$OPENROUTER_API_KEY -v $(pwd):/workspace my-agent-core"

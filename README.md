@@ -1,6 +1,6 @@
 # my-agent-core
 
-pi-coding-agent の Python (uv) 超シンプル版。OpenRouter 専用、Docker 隔離で YOLO モード。
+[pi-agent-core](https://github.com/badlogic/pi-mono/tree/main/packages/agent) の Python (uv) 超シンプル版。OpenRouter 専用、Docker 隔離で YOLO モード。
 
 ## 設計思想
 

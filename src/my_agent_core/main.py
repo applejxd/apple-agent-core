@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import re
 import shutil
 import sys
 import uuid
@@ -16,10 +17,42 @@ from .session import append_and_save, load_session
 from .types import Message
 
 
+def _expand_file_refs(text: str, cwd: str) -> str:
+    """Expand @path references in user input with the contents of the referenced file.
+
+    Only files inside cwd are expanded; path traversal attempts (e.g. @../etc/passwd)
+    are silently left unchanged.
+
+    Example: '@src/foo.py explain this' expands the file inline before sending to the LLM.
+    """
+    pattern = re.compile(r"@([\w./~-]+(?:/[\w./~-]*)*)")
+    cwd_resolved = Path(cwd).resolve()
+
+    def replace(match: re.Match) -> str:
+        ref = match.group(1)
+        p = Path(ref) if Path(ref).is_absolute() else Path(cwd) / ref
+        p = p.resolve()
+        # Reject paths that escape cwd (path traversal guard)
+        try:
+            p.relative_to(cwd_resolved)
+        except ValueError:
+            return match.group(0)
+        if p.exists() and p.is_file():
+            try:
+                content = p.read_text(errors="replace")
+                return f"\n--- @{ref} ---\n{content}\n---"
+            except OSError:
+                pass
+        return match.group(0)
+
+    return pattern.sub(replace, text)
+
+
 def serve() -> None:
     """Launch the web UI server."""
     load_dotenv()
     from .server import serve as _serve
+
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
     print(f"\033[1;32m[my-agent-core]\033[0m Web UI → http://localhost:{port}")
@@ -72,7 +105,9 @@ def main() -> None:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\033[1;32m[my-agent-core]\033[0m session={session.session_id} model={client.model}")
+    print(
+        f"\033[1;32m[my-agent-core]\033[0m session={session.session_id} model={client.model}"
+    )
     print(f"  workspace={base_workspace.absolute()}")
     print(f"  cwd={cwd}")
     print("  Type your message, or 'exit' / Ctrl+C to quit.\n")
@@ -92,6 +127,7 @@ def main() -> None:
                     print("Goodbye.")
                     break
 
+                user_input = _expand_file_refs(user_input, cwd)
                 user_msg = Message(role="user", content=user_input)
                 append_and_save(session, user_msg)
 

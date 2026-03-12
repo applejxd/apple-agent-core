@@ -1,5 +1,4 @@
 import json
-import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -9,7 +8,9 @@ MAX_OUTPUT_BYTES = 100_000
 DEFAULT_BASH_TIMEOUT = 30
 
 
-def _tool(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
+def _tool(
+    name: str, description: str, properties: dict[str, Any], required: list[str]
+) -> dict[str, Any]:
     return {
         "type": "function",
         "function": {
@@ -30,8 +31,14 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "Read file contents. Returns text content with line numbers.",
         {
             "path": {"type": "string", "description": "Absolute or relative file path"},
-            "offset": {"type": "integer", "description": "Start line (1-indexed, optional)"},
-            "limit": {"type": "integer", "description": "Max lines to return (optional)"},
+            "offset": {
+                "type": "integer",
+                "description": "Start line (1-indexed, optional)",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Max lines to return (optional)",
+            },
         },
         ["path"],
     ),
@@ -46,11 +53,18 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     ),
     _tool(
         "edit",
-        "Make a surgical text replacement in a file. old_str must match exactly.",
+        "Make a surgical text replacement in a file. By default old_str must match exactly once; use occurrence_index to target a specific duplicate.",
         {
             "path": {"type": "string", "description": "File path to edit"},
-            "old_str": {"type": "string", "description": "Exact text to find and replace"},
+            "old_str": {
+                "type": "string",
+                "description": "Exact text to find and replace",
+            },
             "new_str": {"type": "string", "description": "Replacement text"},
+            "occurrence_index": {
+                "type": "integer",
+                "description": "1-based index of the occurrence to replace (optional; omit to require exactly one match)",
+            },
         },
         ["path", "old_str", "new_str"],
     ),
@@ -59,7 +73,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "Execute a bash command. Returns combined stdout and stderr.",
         {
             "command": {"type": "string", "description": "Bash command to execute"},
-            "timeout": {"type": "integer", "description": f"Timeout in seconds (default: {DEFAULT_BASH_TIMEOUT})"},
+            "timeout": {
+                "type": "integer",
+                "description": f"Timeout in seconds (default: {DEFAULT_BASH_TIMEOUT})",
+            },
         },
         ["command"],
     ),
@@ -73,7 +90,9 @@ def _resolve(path: str, cwd: str) -> Path:
     return p
 
 
-def tool_read(path: str, cwd: str, offset: int | None = None, limit: int | None = None) -> str:
+def tool_read(
+    path: str, cwd: str, offset: int | None = None, limit: int | None = None
+) -> str:
     p = _resolve(path, cwd)
     try:
         lines = p.read_text(errors="replace").splitlines(keepends=True)
@@ -98,7 +117,14 @@ def tool_write(path: str, content: str, cwd: str) -> str:
     return f"Written {len(content)} bytes to {path}"
 
 
-def tool_edit(path: str, old_str: str, new_str: str, cwd: str) -> str:
+def tool_edit(
+    path: str, old_str: str, new_str: str, cwd: str, occurrence_index: int | None = None
+) -> str:
+    """Replace old_str with new_str in the file.
+
+    If occurrence_index is given (1-based), replace only that occurrence.
+    Otherwise old_str must appear exactly once.
+    """
     p = _resolve(path, cwd)
     try:
         original = p.read_text(errors="replace")
@@ -108,8 +134,25 @@ def tool_edit(path: str, old_str: str, new_str: str, cwd: str) -> str:
     count = original.count(old_str)
     if count == 0:
         return "Error: old_str not found in file. Make sure it matches exactly (whitespace, indentation)."
+
+    if occurrence_index is not None:
+        if occurrence_index < 1 or occurrence_index > count:
+            return f"Error: occurrence_index {occurrence_index} out of range (file has {count} matches)."
+        # Replace only the Nth occurrence
+        parts = original.split(old_str)
+        result = (
+            old_str.join(parts[:occurrence_index])
+            + new_str
+            + old_str.join(parts[occurrence_index:])
+        )
+        p.write_text(result)
+        return f"Edited {path} (occurrence {occurrence_index}/{count})"
+
     if count > 1:
-        return f"Error: old_str found {count} times. It must match exactly once."
+        return (
+            f"Error: old_str found {count} times. "
+            "Make old_str more specific or use occurrence_index to target a particular match."
+        )
 
     p.write_text(original.replace(old_str, new_str, 1))
     return f"Edited {path}"
@@ -147,8 +190,16 @@ def execute_tool(name: str, arguments: str, cwd: str) -> str:
         case "write":
             return tool_write(args["path"], args["content"], cwd)
         case "edit":
-            return tool_edit(args["path"], args["old_str"], args["new_str"], cwd)
+            return tool_edit(
+                args["path"],
+                args["old_str"],
+                args["new_str"],
+                cwd,
+                args.get("occurrence_index"),
+            )
         case "bash":
-            return tool_bash(args["command"], cwd, args.get("timeout", DEFAULT_BASH_TIMEOUT))
+            return tool_bash(
+                args["command"], cwd, args.get("timeout", DEFAULT_BASH_TIMEOUT)
+            )
         case _:
             return f"Error: unknown tool '{name}'"

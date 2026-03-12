@@ -3,8 +3,6 @@
 import asyncio
 import json
 import os
-import uuid
-from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +11,7 @@ from fastapi.responses import HTMLResponse
 
 from .llm import LLMClient, create_client
 from .prompt import build_system_prompt
-from .session import append_and_save, load_session, save_session
+from .session import append_and_save, load_session
 from .tools import TOOL_DEFINITIONS, execute_tool
 from .types import Message, Session
 
@@ -430,10 +428,12 @@ async def list_sessions() -> dict[str, Any]:
             if msgs_file.exists():
                 try:
                     data = json.loads(msgs_file.read_text())
-                    sessions.append({
-                        "id": d.name,
-                        "message_count": len(data),
-                    })
+                    sessions.append(
+                        {
+                            "id": d.name,
+                            "message_count": len(data),
+                        }
+                    )
                 except Exception:
                     pass
     return {"sessions": sessions}
@@ -508,22 +508,26 @@ async def _run_agent(
             break
 
         for tc in tool_calls:
-            await ws.send_json({
-                "type": "tool_start",
-                "tool_call_id": tc.id,
-                "name": tc.function.name,
-                "args": tc.function.arguments,
-            })
+            await ws.send_json(
+                {
+                    "type": "tool_start",
+                    "tool_call_id": tc.id,
+                    "name": tc.function.name,
+                    "args": tc.function.arguments,
+                }
+            )
 
             result = await asyncio.to_thread(
                 execute_tool, tc.function.name, tc.function.arguments, session.cwd
             )
 
-            await ws.send_json({
-                "type": "tool_end",
-                "tool_call_id": tc.id,
-                "result": result,
-            })
+            await ws.send_json(
+                {
+                    "type": "tool_end",
+                    "tool_call_id": tc.id,
+                    "result": result,
+                }
+            )
 
             tool_msg = Message(
                 role="tool",
@@ -538,5 +542,6 @@ async def _run_agent(
 def serve(host: str = "0.0.0.0", port: int = 8000) -> None:
     import uvicorn
     from dotenv import load_dotenv
+
     load_dotenv()
     uvicorn.run(app, host=host, port=port)

@@ -7,7 +7,9 @@ from pathlib import Path
 from .types import Message, Session
 
 SESSION_DIR_ENV = "SESSION_DIR"
-DEFAULT_SESSION_BASE = str(Path.home() / ".local" / "share" / "my-agent-core" / "session")
+DEFAULT_SESSION_BASE = str(
+    Path.home() / ".local" / "share" / "my-agent-core" / "session"
+)
 
 
 def _session_dir(session_id: str) -> Path:
@@ -24,7 +26,9 @@ def load_session(session_id: str, cwd: str) -> Session:
         try:
             data = json.loads(messages_file.read_text())
             session.messages = [Message.from_dict(m) for m in data]
-            print(f"[session] Restored {len(session.messages)} messages from {messages_file}")
+            print(
+                f"[session] Restored {len(session.messages)} messages from {messages_file}"
+            )
         except Exception as e:
             print(f"[session] Warning: could not load session: {e}")
 
@@ -37,7 +41,9 @@ def save_session(session: Session) -> None:
     d.mkdir(parents=True, exist_ok=True)
     messages_file = d / "messages.json"
     messages_file.write_text(
-        json.dumps([m.to_dict() for m in session.messages], ensure_ascii=False, indent=2)
+        json.dumps(
+            [m.to_dict() for m in session.messages], ensure_ascii=False, indent=2
+        )
     )
 
 
