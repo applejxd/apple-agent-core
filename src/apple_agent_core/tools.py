@@ -6,8 +6,13 @@ JSON Schema 定義を提供する。
 
 import json
 import subprocess
+import warnings
 from pathlib import Path
 from typing import Any
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from duckduckgo_search import DDGS
 
 #: bash ツールが返す最大出力サイズ（バイト）。
 MAX_OUTPUT_BYTES = 100_000
@@ -95,6 +100,18 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
         },
         ["command"],
+    ),
+    _tool(
+        "web_search",
+        "Search the web using DuckDuckGo. Returns titles, URLs, and snippets.",
+        {
+            "query": {"type": "string", "description": "Search query"},
+            "max_results": {
+                "type": "integer",
+                "description": "Maximum number of results to return (default: 5)",
+            },
+        },
+        ["query"],
     ),
 ]
 """LLM に提供するツール定義のリスト（JSON Schema 形式）。"""
@@ -230,7 +247,32 @@ def tool_bash(command: str, cwd: str, timeout: int = DEFAULT_BASH_TIMEOUT) -> st
         return f"Error: {e}"
 
 
-async def execute_tool(name: str, arguments: str, cwd: str, session_id: str = "") -> str:
+def tool_web_search(query: str, max_results: int = 5) -> str:
+    """DuckDuckGo で Web 検索を行い、結果を番号付きリストで返す。
+
+    :param query: 検索キーワード。
+    :param max_results: 返す最大件数（デフォルト: 5）。
+    :return: タイトル・URL・要約を含む検索結果文字列。エラー時はエラーメッセージ。
+    """
+    try:
+        results = DDGS().text(query, max_results=max_results)
+    except Exception as e:
+        return f"Error: web search failed: {e}"
+
+    if not results:
+        return f"No results found for: {query}"
+
+    lines: list[str] = []
+    for i, r in enumerate(results, 1):
+        title = r.get("title", "(no title)")
+        href = r.get("href", "")
+        body = r.get("body", "")[:200]
+        lines.append(f"{i}. {title}\n   URL: {href}\n   {body}")
+    return "\n\n".join(lines)
+
+
+async def execute_tool(
+    name: str, arguments: str, cwd: str, session_id: str = "") -> str:
     """ツール名と JSON 引数文字列からツールを実行して結果を返す。
 
     ``APPLE_AGENT_SKIP_DOCKER=1`` が設定されているか、コンテナ内で実行中の場合は
@@ -296,5 +338,7 @@ def _execute_tool_local(name: str, arguments: str, cwd: str) -> str:
             return tool_bash(
                 args["command"], cwd, args.get("timeout", DEFAULT_BASH_TIMEOUT)
             )
+        case "web_search":
+            return tool_web_search(args["query"], args.get("max_results", 5))
         case _:
             return f"Error: unknown tool '{name}'"
