@@ -12,7 +12,7 @@ from typing import Any
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 
 #: bash ツールが返す最大出力サイズ（バイト）。
 MAX_OUTPUT_BYTES = 100_000
