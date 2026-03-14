@@ -230,12 +230,49 @@ def tool_bash(command: str, cwd: str, timeout: int = DEFAULT_BASH_TIMEOUT) -> st
         return f"Error: {e}"
 
 
-def execute_tool(name: str, arguments: str, cwd: str) -> str:
+def execute_tool(name: str, arguments: str, cwd: str, session_id: str = "") -> str:
     """ツール名と JSON 引数文字列からツールを実行して結果を返す。
+
+    ``APPLE_AGENT_SKIP_DOCKER=1`` が設定されているか、コンテナ内で実行中の場合は
+    ローカルで直接ツールを実行する。それ以外は ``docker exec`` 経由で
+    常駐コンテナ内のツールランナーに委譲する。
 
     :param name: ツール名（ ``"read"`` / ``"write"`` / ``"edit"`` / ``"bash"``）。
     :param arguments: JSON 文字列形式のツール引数。
     :param cwd: 相対パスの基準となる作業ディレクトリ。
+    :param session_id: セッション ID（docker exec 経由実行時に使用）。未指定の場合はローカル実行。
+    :return: ツール実行結果の文字列。
+    """
+    if not session_id or _should_run_locally():
+        return _execute_tool_local(name, arguments, cwd)
+
+    import asyncio
+    from .docker import docker_exec_tool
+    return asyncio.run(docker_exec_tool(session_id, name, arguments, cwd))
+
+
+def _should_run_locally() -> bool:
+    """ツールをローカルで実行すべきかどうかを返す。
+
+    コンテナ内実行中、または ``APPLE_AGENT_SKIP_DOCKER=1`` の場合にローカル実行する。
+    """
+    import os
+    from pathlib import Path as _Path
+    if os.environ.get("APPLE_AGENT_SKIP_DOCKER") == "1":
+        return True
+    if os.environ.get("APPLE_AGENT_CONTAINER") == "1":
+        return True
+    if _Path("/.dockerenv").exists():
+        return True
+    return False
+
+
+def _execute_tool_local(name: str, arguments: str, cwd: str) -> str:
+    """ツールをローカル（同一プロセス内）で実行する。
+
+    :param name: ツール名。
+    :param arguments: JSON 文字列形式のツール引数。
+    :param cwd: 作業ディレクトリ。
     :return: ツール実行結果の文字列。
     """
     try:

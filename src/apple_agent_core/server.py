@@ -3,8 +3,8 @@
 ブラウザから使える Web チャット UI を HTML として組み込み、
 WebSocket 経由でエージェントループとリアルタイム通信する。
 
-コンテナ外で実行された場合、各 WebSocket セッションごとに Docker コンテナを
-起動し、JSON-line stdio プロトコルでエージェントと通信する。
+エージェントループはホスト上で直接実行する。ツール実行は
+``docker exec`` 経由でセッション用常駐コンテナに委譲する。
 """
 
 import asyncio
@@ -21,7 +21,7 @@ from .tools import TOOL_DEFINITIONS, execute_tool
 from .types import Message, Session
 from .workspace import get_session_dir
 from .workspace import list_sessions as ws_list_sessions
-from .workspace import prepare_agent, setup_workspace
+from .workspace import get_workspace_base, prepare_agent, setup_workspace
 
 # ---------------------------------------------------------------------------
 # HTML UI (embedded)
@@ -476,19 +476,18 @@ async def api_new_session() -> dict[str, str]:
 async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
     """WebSocket 接続を受け付けてエージェントループを実行する。
 
-    コンテナ外で実行されている場合は、セッションごとに Docker コンテナを起動して
-    JSON-line stdio プロトコルでメッセージを中継する。
-    コンテナ内またはスキップフラグが設定されている場合は直接実行する。
+    エージェントループはホストで直接実行する。
+    ``APPLE_AGENT_SKIP_DOCKER=1`` が未設定の場合は、セッション用の常駐コンテナを起動して
+    ツール実行をコンテナ内に委譲する。
 
     :param websocket: FastAPI WebSocket 接続オブジェクト。
     :param session_id: 接続するセッションの ID。
     """
     await websocket.accept()
 
-    from .docker import create_stdio_subprocess, ensure_image, is_inside_container, should_skip_docker
+    from .docker import ensure_image, ensure_session_container, should_skip_docker, stop_session_container
 
-    if not is_inside_container() and not should_skip_docker():
-        # コンテナ外: Docker コンテナを起動して stdio でメッセージを中継
+    if not should_skip_docker():
         setup_workspace(session_id)
         if not ensure_image():
             await websocket.send_json(
@@ -496,17 +495,14 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
             )
             await websocket.close()
             return
-
-        from .workspace import get_workspace_base
         workspace_base = get_workspace_base()
         try:
-            proc = await create_stdio_subprocess(session_id, workspace_base)
-            await _proxy_to_container(websocket, proc)
+            ensure_session_container(session_id, workspace_base)
         except Exception as e:
             await websocket.send_json({"type": "error", "message": str(e)})
-        return
+            await websocket.close()
+            return
 
-    # コンテナ内 / スキップモード: 直接実行
     cwd, session, system_prompt = prepare_agent(session_id)
 
     try:
@@ -533,52 +529,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
 
     except WebSocketDisconnect:
         pass
-
-
-async def _proxy_to_container(
-    ws: WebSocket,
-    proc: asyncio.subprocess.Process,
-) -> None:
-    """WebSocket メッセージと Docker コンテナの stdio を双方向に中継する。
-
-    WebSocket からのメッセージを JSON-line 形式でコンテナの stdin に転送し、
-    コンテナの stdout からの JSON-line をそのまま WebSocket クライアントに送信する。
-
-    :param ws: クライアントの WebSocket 接続。
-    :param proc: ``--stdio`` モードで動作する Docker コンテナのサブプロセス。
-    """
-
-    async def ws_to_proc() -> None:
-        """WebSocket → コンテナ stdin への転送ループ。"""
-        try:
-            while True:
-                data = await ws.receive_json()
-                line = json.dumps(data, ensure_ascii=False) + "\n"
-                proc.stdin.write(line.encode())
-                await proc.stdin.drain()
-        except (WebSocketDisconnect, asyncio.CancelledError):
-            pass
-
-    async def proc_to_ws() -> None:
-        """コンテナ stdout → WebSocket への転送ループ。"""
-        while True:
-            line = await proc.stdout.readline()
-            if not line:
-                break
-            try:
-                msg = json.loads(line.decode())
-                await ws.send_json(msg)
-            except (json.JSONDecodeError, Exception):
-                pass
-
-    try:
-        await asyncio.gather(ws_to_proc(), proc_to_ws())
     finally:
-        try:
-            proc.terminate()
-            await proc.wait()
-        except ProcessLookupError:
-            pass
+        if not should_skip_docker():
+            stop_session_container(session_id)
 
 
 async def _run_agent(
@@ -635,7 +588,7 @@ async def _run_agent(
             )
 
             result = await asyncio.to_thread(
-                execute_tool, tc.function.name, tc.function.arguments, session.cwd
+                execute_tool, tc.function.name, tc.function.arguments, session.cwd, session.session_id
             )
 
             await ws.send_json(

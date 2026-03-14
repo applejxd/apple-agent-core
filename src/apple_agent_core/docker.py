@@ -1,10 +1,11 @@
 """Docker コンテナ管理モジュール。
 
-セッションごとに Docker コンテナを起動し、エージェントを隔離実行する。
-ホスト側のランチャーと、コンテナ側のエージェントの両方からインポートされる。
+セッションごとに常駐 Docker コンテナを起動し、ツール実行のみをコンテナ内に隔離する。
+エージェントループはホスト側で動作し、ツール実行時のみ ``docker exec`` 経由でコンテナに委譲する。
 """
 
 import asyncio
+import json
 import os
 import subprocess
 import sys
@@ -24,6 +25,9 @@ DEFAULT_IMAGE = "apple-agent-core:latest"
 
 #: コンテナ内のワークスペースマウントポイント。
 CONTAINER_WORKSPACE = "/workspace"
+
+#: docker exec ツール実行のタイムアウト（秒）。
+EXEC_TIMEOUT = 120
 
 
 def is_inside_container() -> bool:
@@ -61,6 +65,15 @@ def get_image_name() -> str:
     return os.environ.get(IMAGE_ENV, DEFAULT_IMAGE)
 
 
+def get_container_name(session_id: str) -> str:
+    """セッション ID からコンテナ名を生成する。
+
+    :param session_id: セッション ID。
+    :return: ``agent-<session_id>`` 形式のコンテナ名。
+    """
+    return f"agent-{session_id}"
+
+
 def ensure_image() -> bool:
     """Docker イメージの存在を確認し、なければ自動ビルドする。
 
@@ -77,7 +90,6 @@ def ensure_image() -> bool:
         return True
 
     print(f"[docker] イメージ '{name}' が見つかりません。ビルドを開始します...")
-    # プロジェクトルート: src/apple_agent_core/docker.py から 3 階層上
     project_root = Path(__file__).parent.parent.parent
     dockerfile = project_root / "docker" / "Dockerfile"
 
@@ -85,86 +97,157 @@ def ensure_image() -> bool:
         ["docker", "build", "-t", name, "-f", str(dockerfile), str(project_root)],
     )
     if build_result.returncode != 0:
-        print(f"[docker] ビルドに失敗しました。手動でビルドしてください: docker build -t {name} -f docker/Dockerfile .", file=sys.stderr)
+        print(
+            f"[docker] ビルドに失敗しました。手動でビルドしてください: docker build -t {name} -f docker/Dockerfile .",
+            file=sys.stderr,
+        )
         return False
 
     print(f"[docker] イメージ '{name}' をビルドしました。")
     return True
 
 
-def _build_docker_run_args(
-    session_id: str,
-    workspace_base: Path,
-    *,
-    interactive: bool = False,
-) -> list[str]:
-    """``docker run`` の共通引数リストを生成する。
+def _is_container_running(container_name: str) -> bool:
+    """指定したコンテナが実行中かどうかを確認する。
 
-    :param session_id: セッション ID。コンテナに環境変数として渡される。
-    :param workspace_base: ホスト側のワークスペースベースディレクトリ（絶対パス）。
-    :param interactive: ``True`` の場合は ``-it`` フラグを追加する（CLI 用）。
-    :return: ``docker run`` に渡す引数リスト（"docker" を含まない）。
+    :param container_name: 確認するコンテナ名。
+    :return: コンテナが実行中の場合は ``True``。
     """
+    result = subprocess.run(
+        [
+            "docker",
+            "inspect",
+            "--format",
+            "{{.State.Running}}",
+            container_name,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0 and result.stdout.strip() == "true"
+
+
+def start_session_container(session_id: str, workspace_base: Path) -> str:
+    """セッション用の常駐 Docker コンテナをデタッチモードで起動する。
+
+    コンテナは ``sleep infinity`` で常駐し、
+    ``docker exec`` によるツール実行を受け付ける状態で待機する。
+
+    :param session_id: セッション ID。
+    :param workspace_base: ホスト側のワークスペースベースディレクトリ。
+    :return: 起動したコンテナの名前。
+    :raises RuntimeError: コンテナの起動に失敗した場合。
+    """
+    container_name = get_container_name(session_id)
     host_workspace = str(workspace_base.resolve())
     image = get_image_name()
 
-    flags = ["run", "--rm"]
-    if interactive:
-        flags.append("-it")
-    else:
-        flags.append("-i")
-
-    args = flags + [
-        "-v", f"{host_workspace}:{CONTAINER_WORKSPACE}",
-        "-e", f"{CONTAINER_FLAG_ENV}=1",
-        "-e", f"WORKSPACE_BASE={CONTAINER_WORKSPACE}",
-        "-e", f"SESSION_ID={session_id}",
-    ]
-
-    # ホスト環境変数を選択的に引き継ぐ
-    for key in ("OPENROUTER_API_KEY", "MODEL", "LOG_LEVEL"):
-        val = os.environ.get(key)
-        if val:
-            args += ["-e", f"{key}={val}"]
-
-    args.append(image)
-    return args
-
-
-def exec_cli_container(session_id: str, workspace_base: Path) -> None:
-    """CLI セッション用 Docker コンテナを起動し、現在のプロセスを置換する。
-
-    ``os.execvp`` を使うため、この関数は正常終了しない。
-    ユーザーはコンテナの stdin/stdout/stderr に直接接続される。
-
-    :param session_id: セッション ID。
-    :param workspace_base: ホスト側のワークスペースベースディレクトリ。
-    """
-    docker_args = _build_docker_run_args(session_id, workspace_base, interactive=True)
-    # entrypoint.sh が引数なしで agent を起動する
-    cmd = ["docker"] + docker_args
-    os.execvp("docker", cmd)
-
-
-async def create_stdio_subprocess(
-    session_id: str,
-    workspace_base: Path,
-) -> asyncio.subprocess.Process:
-    """Web UI 用 Docker コンテナを stdio モードで非同期に起動する。
-
-    コンテナは ``--stdio`` フラグを受け取り、JSON-line プロトコルで
-    stdin/stdout を通じてホストと通信する。
-
-    :param session_id: セッション ID。
-    :param workspace_base: ホスト側のワークスペースベースディレクトリ。
-    :return: 起動した Docker コンテナのサブプロセス。
-    """
-    docker_args = _build_docker_run_args(session_id, workspace_base, interactive=False)
-    cmd = ["docker"] + docker_args + ["--stdio"]
-
-    return await asyncio.create_subprocess_exec(
-        *cmd,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+    result = subprocess.run(
+        [
+            "docker", "run", "-d",
+            "--name", container_name,
+            "-v", f"{host_workspace}:{CONTAINER_WORKSPACE}",
+            "-e", f"{CONTAINER_FLAG_ENV}=1",
+            "-e", f"WORKSPACE_BASE={CONTAINER_WORKSPACE}",
+            "-e", f"SESSION_ID={session_id}",
+            image,
+            "sleep", "infinity",
+        ],
+        capture_output=True,
+        text=True,
     )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"コンテナ '{container_name}' の起動に失敗しました: {result.stderr.strip()}"
+        )
+    return container_name
+
+
+def stop_session_container(session_id: str) -> None:
+    """セッション用の常駐 Docker コンテナを停止・削除する。
+
+    コンテナが存在しない場合はエラーを無視する。
+
+    :param session_id: セッション ID。
+    """
+    container_name = get_container_name(session_id)
+    subprocess.run(
+        ["docker", "stop", container_name],
+        capture_output=True,
+    )
+    subprocess.run(
+        ["docker", "rm", "--force", container_name],
+        capture_output=True,
+    )
+
+
+def ensure_session_container(session_id: str, workspace_base: Path) -> str:
+    """セッション用コンテナが実行中であることを保証する。
+
+    コンテナが未起動の場合は :func:`start_session_container` を呼び出して起動する。
+    既に実行中の場合はそのまま返す。
+
+    :param session_id: セッション ID。
+    :param workspace_base: ホスト側のワークスペースベースディレクトリ。
+    :return: コンテナ名。
+    """
+    container_name = get_container_name(session_id)
+    if not _is_container_running(container_name):
+        start_session_container(session_id, workspace_base)
+    return container_name
+
+
+async def docker_exec_tool(
+    session_id: str,
+    name: str,
+    arguments: str,
+    cwd: str,
+) -> str:
+    """``docker exec`` を使ってコンテナ内でツールを実行する。
+
+    コンテナ内の ``tool_runner.py`` に JSON を stdin で渡し、
+    stdout の JSON から結果文字列を取り出す。
+
+    ``APPLE_AGENT_SKIP_DOCKER=1`` が設定されている場合は
+    ローカルの :func:`~apple_agent_core.tools.execute_tool` を直接呼ぶ。
+
+    :param session_id: セッション ID（コンテナ名の特定に使用）。
+    :param name: ツール名（"read", "write", "edit", "bash"）。
+    :param arguments: JSON 文字列形式のツール引数。
+    :param cwd: ツールが使用する作業ディレクトリ（コンテナ内パス）。
+    :return: ツールの実行結果文字列。
+    """
+    if should_skip_docker():
+        from .tools import execute_tool
+        return execute_tool(name, arguments, cwd)
+
+    container_name = get_container_name(session_id)
+    request = json.dumps({"name": name, "arguments": arguments, "cwd": cwd}, ensure_ascii=False)
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "exec", "-i", container_name,
+            "python", "/app/src/apple_agent_core/tool_runner.py",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(request.encode()),
+            timeout=EXEC_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        return f"[docker exec] タイムアウト: ツール '{name}' が {EXEC_TIMEOUT}s 以内に完了しませんでした。"
+    except Exception as e:
+        return f"[docker exec] エラー: {e}"
+
+    if proc.returncode != 0:
+        err = stderr.decode(errors="replace").strip()
+        return f"[docker exec] ツール '{name}' がエラー終了しました (exit {proc.returncode}): {err}"
+
+    try:
+        result = json.loads(stdout.decode())
+        return result.get("result", "")
+    except json.JSONDecodeError:
+        return stdout.decode(errors="replace")
+
