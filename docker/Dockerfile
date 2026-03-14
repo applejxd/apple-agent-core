@@ -1,5 +1,12 @@
 FROM python:3.13-slim
 
+# Install system utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install uv
 RUN pip install --no-cache-dir uv
 
@@ -10,6 +17,9 @@ COPY templates/ ./templates/
 
 # Install dependencies
 RUN uv sync --no-dev
+
+# Mark this image as running inside a container (prevents recursive Docker launch)
+ENV APPLE_AGENT_CONTAINER=1
 
 # Expose the API port
 EXPOSE 8000

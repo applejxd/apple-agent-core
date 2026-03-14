@@ -2,9 +2,11 @@
 
 ブラウザから使える Web チャット UI を HTML として組み込み、
 WebSocket 経由でエージェントループとリアルタイム通信する。
+
+エージェントループはホスト上で直接実行する。ツール実行は
+``docker exec`` 経由でセッション用常駐コンテナに委譲する。
 """
 
-import asyncio
 import json
 import os
 from typing import Any
@@ -18,7 +20,7 @@ from .tools import TOOL_DEFINITIONS, execute_tool
 from .types import Message, Session
 from .workspace import get_session_dir
 from .workspace import list_sessions as ws_list_sessions
-from .workspace import prepare_agent
+from .workspace import get_workspace_base, prepare_agent, setup_workspace
 
 # ---------------------------------------------------------------------------
 # HTML UI (embedded)
@@ -473,10 +475,33 @@ async def api_new_session() -> dict[str, str]:
 async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
     """WebSocket 接続を受け付けてエージェントループを実行する。
 
+    エージェントループはホストで直接実行する。
+    ``APPLE_AGENT_SKIP_DOCKER=1`` が未設定の場合は、セッション用の常駐コンテナを起動して
+    ツール実行をコンテナ内に委譲する。
+
     :param websocket: FastAPI WebSocket 接続オブジェクト。
     :param session_id: 接続するセッションの ID。
     """
     await websocket.accept()
+
+    from .docker import ensure_image, ensure_session_container, should_skip_docker, stop_session_container
+
+    if not should_skip_docker():
+        setup_workspace(session_id)
+        if not ensure_image():
+            await websocket.send_json(
+                {"type": "error", "message": "Docker イメージのビルドに失敗しました。"}
+            )
+            await websocket.close()
+            return
+        workspace_base = get_workspace_base()
+        try:
+            ensure_session_container(session_id, workspace_base)
+        except Exception as e:
+            await websocket.send_json({"type": "error", "message": str(e)})
+            await websocket.close()
+            return
+
     cwd, session, system_prompt = prepare_agent(session_id)
 
     try:
@@ -503,6 +528,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
 
     except WebSocketDisconnect:
         pass
+    finally:
+        if not should_skip_docker():
+            stop_session_container(session_id)
 
 
 async def _run_agent(
@@ -558,9 +586,7 @@ async def _run_agent(
                 }
             )
 
-            result = await asyncio.to_thread(
-                execute_tool, tc.function.name, tc.function.arguments, session.cwd
-            )
+            result = await execute_tool(tc.function.name, tc.function.arguments, session.cwd, session.session_id)
 
             await ws.send_json(
                 {

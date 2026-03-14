@@ -6,8 +6,13 @@ JSON Schema 定義を提供する。
 
 import json
 import subprocess
+import warnings
 from pathlib import Path
 from typing import Any
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from ddgs import DDGS
 
 #: bash ツールが返す最大出力サイズ（バイト）。
 MAX_OUTPUT_BYTES = 100_000
@@ -95,6 +100,18 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
         },
         ["command"],
+    ),
+    _tool(
+        "web_search",
+        "Search the web using DuckDuckGo. Returns titles, URLs, and snippets.",
+        {
+            "query": {"type": "string", "description": "Search query"},
+            "max_results": {
+                "type": "integer",
+                "description": "Maximum number of results to return (default: 5)",
+            },
+        },
+        ["query"],
     ),
 ]
 """LLM に提供するツール定義のリスト（JSON Schema 形式）。"""
@@ -230,12 +247,79 @@ def tool_bash(command: str, cwd: str, timeout: int = DEFAULT_BASH_TIMEOUT) -> st
         return f"Error: {e}"
 
 
-def execute_tool(name: str, arguments: str, cwd: str) -> str:
+def tool_web_search(query: str, max_results: int = 5) -> str:
+    """DuckDuckGo で Web 検索を行い、結果を番号付きリストで返す。
+
+    :param query: 検索キーワード。
+    :param max_results: 返す最大件数（デフォルト: 5）。
+    :return: タイトル・URL・要約を含む検索結果文字列。エラー時はエラーメッセージ。
+    """
+    try:
+        results = DDGS().text(query, max_results=max_results)
+    except Exception as e:
+        return f"Error: web search failed: {e}"
+
+    if not results:
+        return f"No results found for: {query}"
+
+    lines: list[str] = []
+    for i, r in enumerate(results, 1):
+        title = r.get("title", "(no title)")
+        href = r.get("href", "")
+        body = r.get("body", "")[:200]
+        lines.append(f"{i}. {title}\n   URL: {href}\n   {body}")
+    return "\n\n".join(lines)
+
+
+#: ホスト側（コンテナ外）でのみ実行するツール名のセット。
+#: ネットワーク専用ツールはコンテナにインターネット疎通がなくても動作させるためホスト実行。
+_HOST_ONLY_TOOLS: frozenset[str] = frozenset({"web_search"})
+
+
+async def execute_tool(
+    name: str, arguments: str, cwd: str, session_id: str = "") -> str:
     """ツール名と JSON 引数文字列からツールを実行して結果を返す。
 
-    :param name: ツール名（ ``"read"`` / ``"write"`` / ``"edit"`` / ``"bash"``）。
+    ``APPLE_AGENT_SKIP_DOCKER=1`` が設定されているか、コンテナ内で実行中の場合は
+    ローカルで直接ツールを実行する。それ以外は ``docker exec`` 経由で
+    常駐コンテナ内のツールランナーに委譲する。
+    :data:`_HOST_ONLY_TOOLS` に含まれるツール（``web_search`` など）は常にホスト側で実行する。
+
+    :param name: ツール名（ ``"read"`` / ``"write"`` / ``"edit"`` / ``"bash"`` / ``"web_search"``）。
     :param arguments: JSON 文字列形式のツール引数。
     :param cwd: 相対パスの基準となる作業ディレクトリ。
+    :param session_id: セッション ID（docker exec 経由実行時に使用）。未指定の場合はローカル実行。
+    :return: ツール実行結果の文字列。
+    """
+    if not session_id or _should_run_locally() or name in _HOST_ONLY_TOOLS:
+        return _execute_tool_local(name, arguments, cwd)
+
+    from .docker import docker_exec_tool
+    return await docker_exec_tool(session_id, name, arguments, cwd)
+
+
+def _should_run_locally() -> bool:
+    """ツールをローカルで実行すべきかどうかを返す。
+
+    コンテナ内実行中、または ``APPLE_AGENT_SKIP_DOCKER=1`` の場合にローカル実行する。
+    """
+    import os
+    from pathlib import Path as _Path
+    if os.environ.get("APPLE_AGENT_SKIP_DOCKER") == "1":
+        return True
+    if os.environ.get("APPLE_AGENT_CONTAINER") == "1":
+        return True
+    if _Path("/.dockerenv").exists():
+        return True
+    return False
+
+
+def _execute_tool_local(name: str, arguments: str, cwd: str) -> str:
+    """ツールをローカル（同一プロセス内）で実行する。
+
+    :param name: ツール名。
+    :param arguments: JSON 文字列形式のツール引数。
+    :param cwd: 作業ディレクトリ。
     :return: ツール実行結果の文字列。
     """
     try:
@@ -260,5 +344,7 @@ def execute_tool(name: str, arguments: str, cwd: str) -> str:
             return tool_bash(
                 args["command"], cwd, args.get("timeout", DEFAULT_BASH_TIMEOUT)
             )
+        case "web_search":
+            return tool_web_search(args["query"], args.get("max_results", 5))
         case _:
             return f"Error: unknown tool '{name}'"

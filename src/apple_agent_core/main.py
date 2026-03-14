@@ -2,9 +2,13 @@
 
 ターミナルからエージェントを起動する ``agent`` コマンドを実装する。
 WebUI（FastAPI サーバー）の起動にも対応する。
+
+エージェントループはホスト上で実行し、ツール実行のみを Docker コンテナ内に委譲する。
+``APPLE_AGENT_SKIP_DOCKER=1`` を設定するとコンテナをスキップしてすべてホストで実行する。
 """
 
 import asyncio
+import atexit
 import os
 import re
 import sys
@@ -16,7 +20,7 @@ from .llm import create_client
 from .loop import run_loop
 from .session import append_and_save, new_session_id
 from .types import Message
-from .workspace import get_workspace_base, prepare_agent
+from .workspace import get_workspace_base, prepare_agent, setup_workspace
 
 
 def _expand_file_refs(text: str, cwd: str) -> str:
@@ -70,16 +74,30 @@ def main() -> None:
 
     ``--ui`` / ``-u`` フラグが渡された場合は Web UI サーバーを起動する。
     それ以外はターミナルのインタラクティブ REPL として動作する。
+
+    ``APPLE_AGENT_SKIP_DOCKER=1`` が未設定の場合は、セッション用の常駐
+    Docker コンテナを起動し、ツール実行をコンテナ内に委譲する。
+    セッション終了時に ``atexit`` でコンテナを自動停止・削除する。
     """
     if "--ui" in sys.argv or "-u" in sys.argv:
         serve()
         return
+
     load_dotenv()
 
-    # 1. Determine Session ID
     session_id = os.environ.get("SESSION_ID") or new_session_id()
 
-    # 2. Setup workspace, load session, build system prompt
+    from .docker import ensure_image, ensure_session_container, should_skip_docker, stop_session_container
+
+    if not should_skip_docker():
+        setup_workspace(session_id)
+        if not ensure_image():
+            print("Error: Docker イメージのビルドに失敗しました。", file=sys.stderr)
+            sys.exit(1)
+        workspace_base = get_workspace_base()
+        ensure_session_container(session_id, workspace_base)
+        atexit.register(stop_session_container, session_id)
+
     cwd, session, system_prompt = prepare_agent(session_id)
 
     try:

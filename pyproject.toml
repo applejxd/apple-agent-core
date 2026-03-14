@@ -3,6 +3,7 @@ name = "apple-agent-core"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "ddgs>=7",
     "fastapi>=0.115",
     "folium>=0.20.0",
     "httpx[http2]>=0.27",

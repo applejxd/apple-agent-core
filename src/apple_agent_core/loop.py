@@ -88,7 +88,7 @@ async def run_loop(client: LLMClient, session: Session, system_prompt: str) -> N
             fn_args = tc.function.arguments
             print(f"\n\033[33m[tool: {fn_name}]\033[0m ", end="", flush=True)
 
-            result_text = execute_tool(fn_name, fn_args, session.cwd)
+            result_text = await execute_tool(fn_name, fn_args, session.cwd, session.session_id)
 
             # Show truncated preview
             preview = result_text[:200].replace("\n", " ")
