@@ -271,6 +271,11 @@ def tool_web_search(query: str, max_results: int = 5) -> str:
     return "\n\n".join(lines)
 
 
+#: ホスト側（コンテナ外）でのみ実行するツール名のセット。
+#: ネットワーク専用ツールはコンテナにインターネット疎通がなくても動作させるためホスト実行。
+_HOST_ONLY_TOOLS: frozenset[str] = frozenset({"web_search"})
+
+
 async def execute_tool(
     name: str, arguments: str, cwd: str, session_id: str = "") -> str:
     """ツール名と JSON 引数文字列からツールを実行して結果を返す。
@@ -278,14 +283,15 @@ async def execute_tool(
     ``APPLE_AGENT_SKIP_DOCKER=1`` が設定されているか、コンテナ内で実行中の場合は
     ローカルで直接ツールを実行する。それ以外は ``docker exec`` 経由で
     常駐コンテナ内のツールランナーに委譲する。
+    :data:`_HOST_ONLY_TOOLS` に含まれるツール（``web_search`` など）は常にホスト側で実行する。
 
-    :param name: ツール名（ ``"read"`` / ``"write"`` / ``"edit"`` / ``"bash"``）。
+    :param name: ツール名（ ``"read"`` / ``"write"`` / ``"edit"`` / ``"bash"`` / ``"web_search"``）。
     :param arguments: JSON 文字列形式のツール引数。
     :param cwd: 相対パスの基準となる作業ディレクトリ。
     :param session_id: セッション ID（docker exec 経由実行時に使用）。未指定の場合はローカル実行。
     :return: ツール実行結果の文字列。
     """
-    if not session_id or _should_run_locally():
+    if not session_id or _should_run_locally() or name in _HOST_ONLY_TOOLS:
         return _execute_tool_local(name, arguments, cwd)
 
     from .docker import docker_exec_tool
