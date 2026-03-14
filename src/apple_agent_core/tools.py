@@ -230,7 +230,7 @@ def tool_bash(command: str, cwd: str, timeout: int = DEFAULT_BASH_TIMEOUT) -> st
         return f"Error: {e}"
 
 
-def execute_tool(name: str, arguments: str, cwd: str, session_id: str = "") -> str:
+async def execute_tool(name: str, arguments: str, cwd: str, session_id: str = "") -> str:
     """ツール名と JSON 引数文字列からツールを実行して結果を返す。
 
     ``APPLE_AGENT_SKIP_DOCKER=1`` が設定されているか、コンテナ内で実行中の場合は
@@ -246,9 +246,8 @@ def execute_tool(name: str, arguments: str, cwd: str, session_id: str = "") -> s
     if not session_id or _should_run_locally():
         return _execute_tool_local(name, arguments, cwd)
 
-    import asyncio
     from .docker import docker_exec_tool
-    return asyncio.run(docker_exec_tool(session_id, name, arguments, cwd))
+    return await docker_exec_tool(session_id, name, arguments, cwd)
 
 
 def _should_run_locally() -> bool:

@@ -13,6 +13,7 @@ stdin から JSON リクエストを読み込み、:func:`~apple_agent_core.tool
     ``{"result": "..."}``
 """
 
+import asyncio
 import json
 import sys
 
@@ -24,7 +25,7 @@ def main() -> None:
     try:
         raw = sys.stdin.read()
         req = json.loads(raw)
-        result = execute_tool(req["name"], req["arguments"], req["cwd"])
+        result = asyncio.run(execute_tool(req["name"], req["arguments"], req["cwd"]))
     except Exception as e:
         result = f"[tool_runner] エラー: {e}"
 

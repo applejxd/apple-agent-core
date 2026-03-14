@@ -210,8 +210,8 @@ class TestEnsureSessionContainer:
 class TestDockerExecTool:
     def test_calls_local_when_skip_docker(self, monkeypatch):
         monkeypatch.setenv(SKIP_DOCKER_ENV, "1")
-        # should_skip_docker() が True なので docker_exec_tool 内で execute_tool(local) が呼ばれる
-        with patch("apple_agent_core.tools.execute_tool", return_value="local result") as mock_exec:
+        # should_skip_docker() が True なので docker_exec_tool 内で _execute_tool_local が呼ばれる
+        with patch("apple_agent_core.tools._execute_tool_local", return_value="local result") as mock_exec:
             result = asyncio.run(docker_exec_tool(SESSION_ID, "read", '{"path": "x"}', "/cwd"))
 
         mock_exec.assert_called_once_with("read", '{"path": "x"}', "/cwd")

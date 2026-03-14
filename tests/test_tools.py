@@ -7,6 +7,7 @@ docker exec 委譲（通常モード）の両ルートを検証する。
 import json
 from unittest.mock import patch
 
+import pytest
 
 from apple_agent_core.docker import SKIP_DOCKER_ENV
 from apple_agent_core.tools import execute_tool
@@ -18,11 +19,12 @@ SESSION_ID = "20260101-120000-abcd1234"
 class TestExecuteToolLocal:
     """APPLE_AGENT_SKIP_DOCKER=1 時はローカルで実行される。"""
 
-    def test_read_local(self, tmp_path, monkeypatch):
+    @pytest.mark.anyio
+    async def test_read_local(self, tmp_path, monkeypatch):
         monkeypatch.setenv(SKIP_DOCKER_ENV, "1")
         f = tmp_path / "test.txt"
         f.write_text("hello local")
-        result = execute_tool(
+        result = await execute_tool(
             "read",
             json.dumps({"path": str(f)}),
             str(tmp_path),
@@ -30,9 +32,10 @@ class TestExecuteToolLocal:
         )
         assert "hello local" in result
 
-    def test_write_local(self, tmp_path, monkeypatch):
+    @pytest.mark.anyio
+    async def test_write_local(self, tmp_path, monkeypatch):
         monkeypatch.setenv(SKIP_DOCKER_ENV, "1")
-        result = execute_tool(
+        result = await execute_tool(
             "write",
             json.dumps({"path": "out.txt", "content": "written"}),
             str(tmp_path),
@@ -41,9 +44,10 @@ class TestExecuteToolLocal:
         assert (tmp_path / "out.txt").read_text() == "written"
         assert "written" in result or "ok" in result.lower() or "out.txt" in result
 
-    def test_bash_local(self, tmp_path, monkeypatch):
+    @pytest.mark.anyio
+    async def test_bash_local(self, tmp_path, monkeypatch):
         monkeypatch.setenv(SKIP_DOCKER_ENV, "1")
-        result = execute_tool(
+        result = await execute_tool(
             "bash",
             json.dumps({"command": "echo test_output"}),
             str(tmp_path),
@@ -51,10 +55,11 @@ class TestExecuteToolLocal:
         )
         assert "test_output" in result
 
-    def test_no_session_id_always_runs_local(self, tmp_path, monkeypatch):
+    @pytest.mark.anyio
+    async def test_no_session_id_always_runs_local(self, tmp_path, monkeypatch):
         """session_id 未指定の場合は常にローカル実行。"""
         monkeypatch.delenv(SKIP_DOCKER_ENV, raising=False)
-        result = execute_tool(
+        result = await execute_tool(
             "bash",
             json.dumps({"command": "echo no_session"}),
             str(tmp_path),
@@ -65,7 +70,8 @@ class TestExecuteToolLocal:
 class TestExecuteToolDockerExec:
     """通常モード（コンテナ外）では docker_exec_tool に委譲される。"""
 
-    def test_delegates_to_docker_exec_tool(self, tmp_path, monkeypatch):
+    @pytest.mark.anyio
+    async def test_delegates_to_docker_exec_tool(self, tmp_path, monkeypatch):
         monkeypatch.delenv(SKIP_DOCKER_ENV, raising=False)
         monkeypatch.delenv("APPLE_AGENT_CONTAINER", raising=False)
 
@@ -76,7 +82,7 @@ class TestExecuteToolDockerExec:
         # docker_exec_tool の遅延インポート元をパッチして委譲先を差し替える
         with patch("apple_agent_core.tools._should_run_locally", return_value=False):
             with patch("apple_agent_core.docker.docker_exec_tool", side_effect=mock_docker_exec):
-                result = execute_tool(
+                result = await execute_tool(
                     "read",
                     json.dumps({"path": "x"}),
                     "/cwd",

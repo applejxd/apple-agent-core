@@ -218,8 +218,8 @@ async def docker_exec_tool(
     :return: ツールの実行結果文字列。
     """
     if should_skip_docker():
-        from .tools import execute_tool
-        return execute_tool(name, arguments, cwd)
+        from .tools import _execute_tool_local
+        return _execute_tool_local(name, arguments, cwd)
 
     container_name = get_container_name(session_id)
     request = json.dumps({"name": name, "arguments": arguments, "cwd": cwd}, ensure_ascii=False)

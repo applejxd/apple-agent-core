@@ -7,7 +7,6 @@ WebSocket 経由でエージェントループとリアルタイム通信する�
 ``docker exec`` 経由でセッション用常駐コンテナに委譲する。
 """
 
-import asyncio
 import json
 import os
 from typing import Any
@@ -587,9 +586,7 @@ async def _run_agent(
                 }
             )
 
-            result = await asyncio.to_thread(
-                execute_tool, tc.function.name, tc.function.arguments, session.cwd, session.session_id
-            )
+            result = await execute_tool(tc.function.name, tc.function.arguments, session.cwd, session.session_id)
 
             await ws.send_json(
                 {
